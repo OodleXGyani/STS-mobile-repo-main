@@ -41,24 +41,40 @@ interface GetVehiclesParams {
   searchText?: string;
 }
 
-// New UserVehicle interfaces based on the example response
+// Backend grouped vehicle response structure
 export interface VehicleItem {
+  id: number;
   vehicle_type: string;
   vehicle_model: string | null;
-  vehicle_Number: string;
+  vehicle_number: string;
   vehicle_name: string;
-  device_name: string;
-  vehicle_group: string;
-  id: number;
+  device?: {
+    device_name: string;
+  };
 }
 
+export interface VehicleGroup {
+  group_id: number;
+  group_name: string;
+  vehicle_count: number;
+  vehicles: VehicleItem[];
+}
+
+export interface GroupedVehicleResponse {
+  status: string;
+  total_groups: number;
+  total_vehicles: number;
+  groups: VehicleGroup[];
+}
+
+// Backward compatibility - kept for existing code that may reference it
 export interface VehicleGroupedByBrand {
   name: string;
   vehicles: VehicleItem[];
 }
 
-// Updated to match actual API response structure
-export type UserVehicleResponse = VehicleGroupedByBrand[];
+// Updated to match grouped API response structure
+export type UserVehicleResponse = GroupedVehicleResponse;
 
 interface GetUserVehiclesParams {
   pageIndex?: number;
@@ -76,9 +92,9 @@ export const vehicleApi = api.injectEndpoints({
         params: { pageIndex, pageSize, searchText },
       }),
     }),
-    getUserVehicles: builder.query<VehicleResponse, GetUserVehiclesParams>({
+    getUserVehicles: builder.query<GroupedVehicleResponse, GetUserVehiclesParams>({
       query: ({ pageIndex, pageSize, searchText } = {}) => ({
-        url: "/Vehicle",
+        url: "/vehicle",
         method: "GET",
         params: { pageIndex, pageSize, searchText },
       }),

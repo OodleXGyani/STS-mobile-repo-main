@@ -33,6 +33,7 @@ const ReportDetail: React.FC = () => {
     userVehiclesLoading,
     userVehiclesError,
     userVehiclesFetching,
+    userVehiclesSuccess,
     pageIndex,
     pageSize,
     selectedYear,
@@ -149,8 +150,14 @@ const ReportDetail: React.FC = () => {
             onReset={handleReset}
           />
 
-          {/* Show no data message if no vehicles */}
-          {!vehicleGroups || vehicleGroups.length === 0 ? (
+          {/* Show loading state first */}
+          {(userVehiclesLoading || userVehiclesFetching) && !userVehiclesSuccess ? (
+            <VehicleLoadingContainer>
+              <ActivityIndicator size="large" color={Colors.primary_blue_color} />
+              <VehicleLoadingText>Loading vehicles...</VehicleLoadingText>
+            </VehicleLoadingContainer>
+          ) : userVehiclesSuccess && vehicleGroups.length === 0 ? (
+            // Show no data message ONLY after success and vehicles are truly empty
             <NoDataContainer>
               <NoDataIcon>🚗</NoDataIcon>
               <NoDataTitle>No Vehicles Found</NoDataTitle>
@@ -416,6 +423,19 @@ const LoadingModalSubText = styled.Text`
   margin-top: ${verticalScale(8)}px;
   text-align: center;
   line-height: ${moderateScale(20)}px;
+`;
+
+const VehicleLoadingContainer = styled.View`
+  padding: ${verticalScale(40)}px ${scale(20)}px;
+  align-items: center;
+  justify-content: center;
+`;
+
+const VehicleLoadingText = styled.Text`
+  margin-top: ${verticalScale(16)}px;
+  font-size: ${moderateScale(16)}px;
+  color: #666;
+  text-align: center;
 `;
 
 export default ReportDetail;

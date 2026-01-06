@@ -4,7 +4,7 @@ import { NavigationProp, useFocusEffect } from '@react-navigation/native';
 import { showSafeAlert } from '../../../../../utils/AlertUtils';
 import {
   useGetUserVehiclesQuery,
-  VehicleGroupedByBrand,
+  VehicleGroup,
   VehicleItem,
 } from '../../../../../services/vehicles';
 import { ReportType } from '../../../../../constants/reportTypes';
@@ -26,7 +26,7 @@ export const useReportDetail = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVehicles, setSelectedVehicles] = useState<VehicleItem[]>([]);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
+  const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>(
     {},
   );
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
@@ -76,62 +76,103 @@ export const useReportDetail = () => {
     }, [])
   );
 
-  // Call the RTK Query to get user vehicles
+  // Call the RTK Query to get user vehicles with default params
   const {
     data: userVehicleResponse,
     error: userVehiclesError,
     isLoading: userVehiclesLoading,
     isFetching: userVehiclesFetching,
-  } = useGetUserVehiclesQuery({ pageIndex, pageSize, searchText: searchQuery });
+    isSuccess: userVehiclesSuccess,
+  } = useGetUserVehiclesQuery({
+    pageIndex: 1,
+    pageSize: 1000, // Get all vehicles in one call
+    searchText: '',
+  });
 
-  // Transform vehicle list into grouped format for VehicleAccordion
-  const vehicleGroups: VehicleGroupedByBrand[] = useMemo(() => {
-    if (!userVehicleResponse?.items || userVehicleResponse.items.length === 0) {
-      return [];
+  // Use vehicle groups directly from backend response - only after success
+  const vehicleGroups: VehicleGroup[] = useMemo(() => {
+    if (!userVehiclesSuccess) return [];
+
+    // Handle new grouped format
+    if (userVehicleResponse?.groups && Array.isArray(userVehicleResponse.groups)) {
+      console.log('✅ Using grouped format from API:', userVehicleResponse.groups);
+      return userVehicleResponse.groups;
     }
 
-    // Group vehicles by brand field from API response
-    // Transform VehicleInterface to VehicleItem format expected by VehicleAccordion
-    const grouped = userVehicleResponse.items.reduce((acc, vehicle) => {
-      const groupName = vehicle.brand || 'Ungrouped';
-      const transformedVehicle: VehicleItem = {
-        vehicle_type: 'Standard',
-        vehicle_model: null,
-        vehicle_Number: vehicle.number,
-        vehicle_name: vehicle.alias || vehicle.number,
-        device_name: vehicle.number,
-        vehicle_group: groupName,
-        id: vehicle.id,
-      };
+    // Handle old flat format - transform it to grouped format
+    if (userVehicleResponse?.items && Array.isArray(userVehicleResponse.items)) {
+      console.log('🔄 Converting old items format to grouped format...');
 
-      const existingGroup = acc.find(g => g.name === groupName);
+      // Group vehicles by their vehicleGroup field (or 'Ungrouped' if none)
+      const groupMap = new Map<string, VehicleItem[]>();
 
-      if (existingGroup) {
-        existingGroup.vehicles.push(transformedVehicle);
-      } else {
-        acc.push({
-          name: groupName,
-          vehicles: [transformedVehicle],
-        });
-      }
+      userVehicleResponse.items.forEach((vehicle: any) => {
+        const groupName = vehicle.vehicleGroup || vehicle.brand || 'Ungrouped';
 
-      return acc;
-    }, [] as VehicleGroupedByBrand[]);
+        if (!groupMap.has(groupName)) {
+          groupMap.set(groupName, []);
+        }
 
-    return grouped;
-  }, [userVehicleResponse]);
+        const transformedVehicle: VehicleItem = {
+          id: vehicle.id,
+          vehicle_type: vehicle.type || 'Standard',
+          vehicle_model: vehicle.makeModelId || null,
+          vehicle_number: vehicle.number,
+          vehicle_name: vehicle.alias || vehicle.number,
+          device: {
+            device_name: vehicle.number,
+          },
+        };
 
-  console.log(userVehicleResponse, 'vehicleGroups');
+        groupMap.get(groupName)!.push(transformedVehicle);
+      });
+
+      // Convert map to grouped format
+      let groupId = 1;
+      const groups: VehicleGroup[] = Array.from(groupMap).map(([groupName, vehicles]) => ({
+        group_id: groupId++,
+        group_name: groupName,
+        vehicle_count: vehicles.length,
+        vehicles: vehicles,
+      }));
+
+      console.log('✅ Transformed to grouped format:', groups);
+      return groups;
+    }
+
+    // Fallback for completely empty response
+    console.warn('⚠️ Response has neither groups nor items field:', userVehicleResponse);
+    return [];
+  }, [userVehiclesSuccess, userVehicleResponse]);
+
+  // Debug log
+  if (userVehiclesSuccess) {
+    console.log('🚗 Vehicles query state:', {
+      isLoading: userVehiclesLoading,
+      isFetching: userVehiclesFetching,
+      isSuccess: userVehiclesSuccess,
+      hasResponse: !!userVehicleResponse,
+      responseKeys: userVehicleResponse ? Object.keys(userVehicleResponse) : [],
+      hasGroups: !!userVehicleResponse?.groups,
+      hasItems: !!userVehicleResponse?.items,
+      itemsLength: (userVehicleResponse?.items as any[])?.length ?? 0,
+      groupsLength: (userVehicleResponse?.groups as any[])?.length ?? 0,
+      vehicleGroupsLength: vehicleGroups.length,
+      error: userVehiclesError,
+      fullResponse: userVehicleResponse,
+    });
+  }
+
 
   // Generate weeks for the selected month and year
   const availableWeeks = useMemo(() => {
     return generateWeeksForMonth(selectedYear, selectedMonth);
   }, [selectedYear, selectedMonth]);
   // Handle accordion group toggle
-  const handleGroupToggle = useCallback((manufacturer: string) => {
+  const handleGroupToggle = useCallback((groupId: number) => {
     setExpandedGroups(prev => ({
       ...prev,
-      [manufacturer]: !prev[manufacturer],
+      [groupId]: !prev[groupId],
     }));
   }, []);
   // Handle vehicle selection with 5 vehicle limit
@@ -389,10 +430,11 @@ export const useReportDetail = () => {
 
   // Pagination handlers
   const handleNextPage = useCallback(() => {
-    if (vehicleGroups && vehicleGroups.length === pageSize) {
+    const totalVehicles = userVehicleResponse?.total_vehicles ?? 0;
+    if (totalVehicles > pageIndex * pageSize) {
       setPageIndex(pageIndex + 1);
     }
-  }, [pageIndex, vehicleGroups, pageSize]);
+  }, [pageIndex, userVehicleResponse, pageSize]);
 
   const handlePrevPage = useCallback(() => {
     if (pageIndex > 1) {
@@ -411,6 +453,7 @@ export const useReportDetail = () => {
     userVehiclesLoading,
     userVehiclesError,
     userVehiclesFetching,
+    userVehiclesSuccess,
     pageIndex,
     pageSize,
     selectedYear,

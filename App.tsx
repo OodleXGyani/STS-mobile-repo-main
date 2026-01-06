@@ -52,9 +52,9 @@ function AppContent() {
   useLoadAuth(); // ✅ Runs auth loading
 
   const { authLoading, token } = useSelector((state: RootState) => state.auth);
-  console.log('🔍 App.tsx - authLoading:', authLoading, 'token:', token);
+  // console.log('🔍 App.tsx - authLoading:', authLoading, 'token:', token);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-console.log('token', token)
+  console.log('token', token)
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {

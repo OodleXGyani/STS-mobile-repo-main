@@ -4,13 +4,13 @@ import styled from 'styled-components/native';
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import { Colors } from '../../../../../constants/colors';
 import Icons from '../../../../../common/icons';
-import type { VehicleItem, VehicleGroupedByBrand } from '../../../../../services/vehicles';
+import type { VehicleItem, VehicleGroup } from '../../../../../services/vehicles';
 
 interface VehicleAccordionProps {
-  vehicleGroups: VehicleGroupedByBrand[];
-  expandedGroups: Record<string, boolean>;
+  vehicleGroups: VehicleGroup[];
+  expandedGroups: Record<number, boolean>;
   selectedVehicles: VehicleItem[];
-  onGroupToggle: (manufacturer: string) => void;
+  onGroupToggle: (groupId: number) => void;
   onVehicleToggle: (vehicle: VehicleItem) => void;
 }
 
@@ -23,13 +23,13 @@ const VehicleAccordion: React.FC<VehicleAccordionProps> = ({
 }) => {
   return (
     <Container>
-      {vehicleGroups.map((group, groupIndex) => {
-        const isExpanded = expandedGroups[group.name] ?? group.vehicles.length > 0;
+      {vehicleGroups.map(group => {
+        const isExpanded = expandedGroups[group.group_id] ?? group.vehicles.length > 0;
 
         return (
-          <VehicleGroup key={groupIndex}>
-            <GroupHeader onPress={() => onGroupToggle(group.name)}>
-              <GroupTitle>{group.name}</GroupTitle>
+          <VehicleGroup key={group.group_id}>
+            <GroupHeader onPress={() => onGroupToggle(group.group_id)}>
+              <GroupTitle>{group.group_name} ({group.vehicle_count})</GroupTitle>
               <GroupArrow
                 source={
                   isExpanded ? Icons.caret_up_blue : Icons.caret_down_blue
@@ -56,7 +56,7 @@ const VehicleAccordion: React.FC<VehicleAccordionProps> = ({
                     </CheckboxContainer>
 
                     <VehicleIcon source={Icons.car_blue} />
-                    <VehicleName>{vehicle.vehicle_name || vehicle.vehicle_Number}</VehicleName>
+                    <VehicleName>{vehicle.vehicle_name}</VehicleName>
                     <VehicleStatus>{vehicle.vehicle_type || 'N/A'}</VehicleStatus>
                   </VehicleItemContainer>
                 ))}
