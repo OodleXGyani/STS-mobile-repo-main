@@ -12,6 +12,7 @@ import {
   YearMonthSelection,
   VehicleSearch,
   VehicleAccordion,
+  DebugVehicleGroups,
   WeekCheckbox,
   GenerateReportButton,
 } from './components';
@@ -65,7 +66,7 @@ const ReportDetail: React.FC = () => {
       >
         <ReportHeader
           title={report}
-          onBackPress={() => (navigation as any).navigate('Reports')}
+          onBackPress={() => navigation.goBack()}
         />
         <LoadingContainer>
           <ActivityIndicator size="large" color={Colors.primary_blue_color} />
@@ -83,7 +84,7 @@ const ReportDetail: React.FC = () => {
       >
         <ReportHeader
           title={report}
-          onBackPress={() => (navigation as any).navigate('Reports')}
+          onBackPress={() => navigation.goBack()}
         />
         <ErrorContainer>
           <ErrorIcon>⚠️</ErrorIcon>
@@ -110,7 +111,7 @@ const ReportDetail: React.FC = () => {
     >
       <ReportHeader
         title={report}
-        onBackPress={() => (navigation as any).navigate('Reports')}
+        onBackPress={() => navigation.goBack()}
       />
 
       <Content>
@@ -181,6 +182,9 @@ const ReportDetail: React.FC = () => {
                 onGroupToggle={handleGroupToggle}
                 onVehicleToggle={handleVehicleToggle}
               />
+
+              {/* Debug Info - Shows group structure */}
+              {/* <DebugVehicleGroups vehicleGroups={vehicleGroups} /> */}
 
               {/* Pagination Controls */}
               {/* {vehicleGroups.length > 0 && (

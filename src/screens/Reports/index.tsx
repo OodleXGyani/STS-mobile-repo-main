@@ -300,7 +300,6 @@ const ReportsScreen: React.FC = () => {
               {/* Available Reports Section */}
               {implementedReports.length > 0 && (
                 <>
-                  <SectionTitle>Available Reports</SectionTitle>
                   {implementedReports.map((report: ReportItem & { isComingSoon: boolean }) => (
                     <ReportOptionItem
                       key={report.id}
@@ -313,7 +312,7 @@ const ReportsScreen: React.FC = () => {
               )}
 
               {/* Coming Soon Section */}
-              {comingSoonReports.length > 0 && (
+              {/* {comingSoonReports.length > 0 && (
                 <>
                   {implementedReports.length > 0 && <SectionDivider />}
                   <SectionTitle>Coming Soon</SectionTitle>
@@ -329,7 +328,7 @@ const ReportsScreen: React.FC = () => {
                     </DisabledReportContainer>
                   ))}
                 </>
-              )}
+              )} */}
 
               {isFetching && (
                 <CenterContainer>

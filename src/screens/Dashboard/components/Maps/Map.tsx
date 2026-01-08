@@ -67,7 +67,7 @@ const MapListView: React.FC<Props> = ({
 
   const { liveTrackData } = useDashboardLiveTrack();
   const { filters, sort } = useFilterState();
-  
+
   // Get the current groupBy value for FilterBar
   const currentGroupBy = sort?.groupBy || 'status';
 
@@ -77,7 +77,7 @@ const MapListView: React.FC<Props> = ({
     // Use selectedVehicles which already contains the grouped/filtered data
     return selectedVehicles.length > 0 ? selectedVehicles : [];
   }, [selectedVehicles]);
-console.log('vehiclesToShow', vehiclesToShow);
+  console.log('vehiclesToShow', vehiclesToShow);
 
   const renderOsmTile = menuState.mapLayer === 'osm';
   const mapType = useMemo(() => {
@@ -126,10 +126,10 @@ console.log('vehiclesToShow', vehiclesToShow);
               if (!vehicle.coordinates || vehicle.coordinates.length !== 2) {
                 return null;
               }
-              
+
               return (
                 <Marker
-                  key={vehicle.key}
+                  key={`marker-${vehicle.id}`}
                   coordinate={{
                     latitude: vehicle.coordinates[1],
                     longitude: vehicle.coordinates[0],
@@ -138,8 +138,8 @@ console.log('vehiclesToShow', vehiclesToShow);
                   tracksViewChanges={false}
                   centerOffset={{ x: 0, y: -12 }}
                 >
-                  <View style={{ 
-                    alignItems: 'center', 
+                  <View style={{
+                    alignItems: 'center',
                     justifyContent: 'center',
                   }}>
                     <DynamicVehicleIcon status={vehicle.status} />

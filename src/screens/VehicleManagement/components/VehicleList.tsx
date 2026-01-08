@@ -57,7 +57,6 @@ const VehicleRow: React.FC<{ item: VehicleInterface }> = ({ item }) => (
 const VehicleList: React.FC<VehicleListProps> = ({ searchQuery, sortBy, sortType }) => {
   const pageSize = 10;
   const [pageIndex, setPageIndex] = useState(1);
-
   const debouncedSearch = useDebounce(searchQuery, 500);
 
   const { data, error, isLoading, isFetching, refetch } = useGetVehiclesQuery({
@@ -65,10 +64,12 @@ const VehicleList: React.FC<VehicleListProps> = ({ searchQuery, sortBy, sortType
     pageSize,
     searchText: debouncedSearch,
   });
-console.log('🔍 VehicleList data:', data);
+
+  console.log('🔍 VehicleList data:', data);
 
   // Handle direct array data or wrapped response
   const vehicleData = Array.isArray(data) ? data : data?.items || [];
+
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -78,14 +79,15 @@ console.log('🔍 VehicleList data:', data);
     setRefreshing(false);
   };
 
-  const totalPages = Array.isArray(data) 
+  const totalPages = Array.isArray(data)
     ? 1 // Direct array data - no pagination info
     : data
-    ? Math.max(
+      ? Math.max(
         1,
         Math.ceil((data.totalCount ?? 0) / (data.pageSize ?? pageSize)),
       )
-    : 1;
+      : 1;
+
   const currentPage = Array.isArray(data) ? 1 : data?.pageIndex ?? pageIndex;
 
   // Reset to first page when search query changes
@@ -103,7 +105,7 @@ console.log('🔍 VehicleList data:', data);
 
   const sortedData = React.useMemo(() => {
     if (!vehicleData?.length) return [];
-  
+
     return [...vehicleData].sort((a, b) => {
       if (sortBy === 'reg_no') {
         // ✅ Numeric sort
@@ -114,14 +116,13 @@ console.log('🔍 VehicleList data:', data);
         // ✅ Alphabetical sort for name
         const valA = (a.alias || '').toLowerCase();
         const valB = (b.alias || '').toLowerCase();
-  
+
         if (valA < valB) return sortType === 'asc' ? -1 : 1;
         if (valA > valB) return sortType === 'asc' ? 1 : -1;
         return 0;
       }
     });
   }, [vehicleData, sortBy, sortType]);
-  
 
   return (
     <Screen>

@@ -8,9 +8,9 @@ import type { VehicleItem, VehicleGroup } from '../../../../../services/vehicles
 
 interface VehicleAccordionProps {
   vehicleGroups: VehicleGroup[];
-  expandedGroups: Record<number, boolean>;
+  expandedGroups: Record<string, boolean>;
   selectedVehicles: VehicleItem[];
-  onGroupToggle: (groupId: number) => void;
+  onGroupToggle: (groupId: string) => void;
   onVehicleToggle: (vehicle: VehicleItem) => void;
 }
 
@@ -24,23 +24,26 @@ const VehicleAccordion: React.FC<VehicleAccordionProps> = ({
   return (
     <Container>
       {vehicleGroups.map(group => {
-        const isExpanded = expandedGroups[group.group_id] ?? group.vehicles.length > 0;
+        const groupKey = String(group.group_id);
+        const isGroupExpanded = expandedGroups[groupKey] ?? group.vehicles.length > 0;
 
         return (
           <VehicleGroup key={group.group_id}>
-            <GroupHeader onPress={() => onGroupToggle(group.group_id)}>
+            {/* Group header */}
+            <GroupHeader onPress={() => onGroupToggle(groupKey)}>
               <GroupTitle>{group.group_name} ({group.vehicle_count})</GroupTitle>
               <GroupArrow
                 source={
-                  isExpanded ? Icons.caret_up_blue : Icons.caret_down_blue
+                  isGroupExpanded ? Icons.caret_up_blue : Icons.caret_down_blue
                 }
                 style={{
-                  transform: [{ rotate: isExpanded ? '0deg' : '0deg' }],
+                  transform: [{ rotate: isGroupExpanded ? '0deg' : '0deg' }],
                 }}
               />
             </GroupHeader>
 
-            {isExpanded && (
+            {/* Vehicles list */}
+            {isGroupExpanded && (
               <VehicleList>
                 {group.vehicles.map(vehicle => (
                   <VehicleItemContainer
@@ -56,7 +59,7 @@ const VehicleAccordion: React.FC<VehicleAccordionProps> = ({
                     </CheckboxContainer>
 
                     <VehicleIcon source={Icons.car_blue} />
-                    <VehicleName>{vehicle.vehicle_name}</VehicleName>
+                    <VehicleName>{vehicle.alias || vehicle.vehicle_name}</VehicleName>
                     <VehicleStatus>{vehicle.vehicle_type || 'N/A'}</VehicleStatus>
                   </VehicleItemContainer>
                 ))}
@@ -102,12 +105,13 @@ const VehicleList = styled.View`
   background-color: #ffffff;
   border: 1px solid #e5e5ea;
   border-top-width: 0;
+  padding-left: ${scale(16)}px;
 `;
 
 const VehicleItemContainer = styled.TouchableOpacity`
   flex-direction: row;
   align-items: center;
-  padding: ${verticalScale(12)}px ${scale(16)}px;
+  padding: ${verticalScale(10)}px ${scale(16)}px;
   border-bottom-width: 1px;
   border-bottom-color: #f0f0f0;
 `;

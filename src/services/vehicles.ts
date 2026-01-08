@@ -41,18 +41,38 @@ interface GetVehiclesParams {
   searchText?: string;
 }
 
-// Backend grouped vehicle response structure
+// Vehicle item within a group - represents individual vehicle data from backend
 export interface VehicleItem {
   id: number;
   vehicle_type: string;
   vehicle_model: string | null;
   vehicle_number: string;
   vehicle_name: string;
+  alias?: string;
   device?: {
     device_name: string;
   };
+  typeName?: string;
+  typeId?: number;
 }
 
+// Direct backend response format from the API (array of groups with "name" field)
+// Shape: [{ "name": "BE", "vehicles": [...] }, { "name": "BL", "vehicles": [...] }]
+export interface BackendVehicleGroup {
+  name: string;
+  vehicles: Array<{
+    id: number;
+    vehicle_type: string;
+    vehicle_model: string | null;
+    vehicle_Number: string;
+    vehicle_name: string;
+    device_name: string;
+    vehicle_group: string;
+  }>;
+}
+
+// Normalized vehicle group - used internally to standardize both backend response formats
+// Single source of truth: group_name (from backend "name" or "group_name" field)
 export interface VehicleGroup {
   group_id: number;
   group_name: string;
@@ -60,6 +80,16 @@ export interface VehicleGroup {
   vehicles: VehicleItem[];
 }
 
+// Sub-group for secondary categorization (NOT USED - kept for backward compatibility)
+// DO NOT use this for rendering. Backend groups are the single source of truth.
+export interface VehicleSubGroup {
+  subgroup_id: string;
+  subgroup_name: string;
+  vehicle_count: number;
+  vehicles: VehicleItem[];
+}
+
+// Wrapped API response format: { "status": "success", "groups": [...] }
 export interface GroupedVehicleResponse {
   status: string;
   total_groups: number;
@@ -67,14 +97,11 @@ export interface GroupedVehicleResponse {
   groups: VehicleGroup[];
 }
 
-// Backward compatibility - kept for existing code that may reference it
-export interface VehicleGroupedByBrand {
-  name: string;
-  vehicles: VehicleItem[];
-}
-
 // Updated to match grouped API response structure
-export type UserVehicleResponse = GroupedVehicleResponse;
+// Can be either:
+// 1. Direct array: BackendVehicleGroup[] - array of groups with "name" field
+// 2. Wrapped object: GroupedVehicleResponse - object with "groups" array and metadata
+export type UserVehicleResponse = GroupedVehicleResponse | BackendVehicleGroup[];
 
 interface GetUserVehiclesParams {
   pageIndex?: number;
@@ -92,7 +119,7 @@ export const vehicleApi = api.injectEndpoints({
         params: { pageIndex, pageSize, searchText },
       }),
     }),
-    getUserVehicles: builder.query<GroupedVehicleResponse, GetUserVehiclesParams>({
+    getUserVehicles: builder.query<UserVehicleResponse, GetUserVehiclesParams>({
       query: ({ pageIndex, pageSize, searchText } = {}) => ({
         url: "/vehicle",
         method: "GET",

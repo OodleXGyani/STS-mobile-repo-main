@@ -108,3 +108,20 @@ const dateRange = formatDateRangeForAPI(today);
 const todayRange = getTodayDateRangeForAPI();
 // Returns: { startDate: "#01/15/2025 12:00:00 AM#", endDate: "#01/15/2025 11:59:59 PM#" }
 */
+
+/**
+ * Formats a Date object to ISO 8601 format (UTC) for newer API endpoints
+ * @param date - JavaScript Date object
+ * @param isStartOfDay - If true, sets time to 00:00:00 UTC, else 23:59:59 UTC
+ * @returns ISO 8601 string: YYYY-MM-DDTHH:mm:ss.sssZ
+ */
+export const formatDateToISO = (date: Date, isStartOfDay: boolean = true): string => {
+  const targetDate = new Date(date);
+  // Use UTC methods to ensure we get 00:00:00Z matching the date selected irrespective of local time
+  if (isStartOfDay) {
+    targetDate.setUTCHours(0, 0, 0, 0);
+  } else {
+    targetDate.setUTCHours(23, 59, 59, 999);
+  }
+  return targetDate.toISOString();
+};

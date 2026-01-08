@@ -114,25 +114,51 @@ function validateReportPayload(
     );
   }
 
-  // Validate date format (should be SmartTrack format: #MM/DD/YYYY HH:MM:SS AM/PM#)
-  // The date is already formatted by formatDateForAPI() before reaching here
+  // Validate date format
+  // SmartTrack format: #MM/DD/YYYY HH:MM:SS AM/PM#
+  // ISO 8601 format: 2025-11-06T00:00:00.000Z
   const smartTrackDateRegex = /^#\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}:\d{2} (AM|PM)#$/;
-  if (!smartTrackDateRegex.test(startDate)) {
-    throw new ReportPayloadValidationError(
-      `Invalid start date format: ${startDate}. Expected SmartTrack format: #MM/DD/YYYY HH:MM:SS AM/PM#`,
-      reportType,
-      'startDate'
-    );
-  }
+  // Simple ISO 8601 regex check (YYYY-MM-DD...)
+  const iso8601Regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
 
-  // For reports that require endDate
-  if (endDate && endDate.trim() !== '') {
-    if (!smartTrackDateRegex.test(endDate)) {
+  // Reports using ISO format: Weekly Summary & Position Activity
+  const usesIsoFormat = reportType === REPORT_TYPES.WEEKLY_SUMMARY || reportType === REPORT_TYPES.POSITION_ACTIVITY;
+
+  if (usesIsoFormat) {
+    if (!iso8601Regex.test(startDate)) {
       throw new ReportPayloadValidationError(
-        `Invalid end date format: ${endDate}. Expected SmartTrack format: #MM/DD/YYYY HH:MM:SS AM/PM#`,
+        `Invalid start date format: ${startDate}. Expected ISO 8601 format.`,
         reportType,
-        'endDate'
+        'startDate'
       );
+    }
+    if (endDate && endDate.trim() !== '') {
+      if (!iso8601Regex.test(endDate)) {
+        throw new ReportPayloadValidationError(
+          `Invalid end date format: ${endDate}. Expected ISO 8601 format.`,
+          reportType,
+          'endDate'
+        );
+      }
+    }
+  } else {
+    // Legacy SmartTrack format validation
+    if (!smartTrackDateRegex.test(startDate)) {
+      throw new ReportPayloadValidationError(
+        `Invalid start date format: ${startDate}. Expected SmartTrack format: #MM/DD/YYYY HH:MM:SS AM/PM#`,
+        reportType,
+        'startDate'
+      );
+    }
+
+    if (endDate && endDate.trim() !== '') {
+      if (!smartTrackDateRegex.test(endDate)) {
+        throw new ReportPayloadValidationError(
+          `Invalid end date format: ${endDate}. Expected SmartTrack format: #MM/DD/YYYY HH:MM:SS AM/PM#`,
+          reportType,
+          'endDate'
+        );
+      }
     }
   }
 }
@@ -195,13 +221,16 @@ export function buildReportPayload(
       return {
         startDate,
         endDate: endDate ?? startDate,
-        vehicle: selectedVehicles[0],  // Single vehicle ID
+        vehicle: selectedVehicles[0],  // Single vehicle ID (Legacy/Fallback)
+        items: vehicleIds,             // Array of integer IDs for Int32[] (Fix for multi-vehicle)
       };
 
     case REPORT_TYPES.WEEKLY_SUMMARY:
       return {
-        startDate,
-        vehicle: selectedVehicles.join(','),  // Comma-separated vehicle IDs
+        startTime: startDate,        // Map startDate to startTime
+        endTime: endDate ?? startDate, // Map endDate to endTime
+        items: vehicleIds,
+        reportType: 'vehicle',
       };
 
     case REPORT_TYPES.MONTHLY_SUMMARY:

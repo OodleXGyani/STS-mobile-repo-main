@@ -64,11 +64,14 @@ export interface DailySummaryPayload {
   startDate: string;
   endDate: string;
   vehicle: string;
+  items: number[]; // Added to match backend expectation of a list
 }
 
 export interface WeeklySummaryPayload {
-  startDate: string;
-  vehicle: string;
+  startTime: string;      // ISO 8601 format
+  endTime: string;        // ISO 8601 format
+  items: number[];        // Array of integer vehicle IDs
+  reportType: 'vehicle';  // Fixed value
 }
 
 export interface MonthlySummaryPayload {

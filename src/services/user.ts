@@ -4,7 +4,7 @@ export const userApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getUser: builder.query<any, void>({
       query: () => '/user',
-      providesTags: ['User'], 
+      providesTags: ['User'],
     }),
     getUserById: builder.query<any, number>({
       query: (id) => `/user/${id}`,
@@ -13,7 +13,7 @@ export const userApi = api.injectEndpoints({
     //   query: () => 'Groups/33261/getUserManagementTreeList',
     // }),
     getUserManagementTreeList: builder.query<any, void>({
-      query: () => '/groups/users',
+      query: () => '/group/33533/usermanagement-tree',
     }),
     // '/groups/users'
     resetUserPassword: builder.mutation<any, { newPassword: string; userId: string }>({
@@ -28,13 +28,13 @@ export const userApi = api.injectEndpoints({
         url: `user/${id}`,
         method: "PUT",
         body: {
-          id,              
-          ...payload,      
+          id,
+          ...payload,
         },
       }),
-      invalidatesTags: ['User'], 
+      invalidatesTags: ['User'],
     }),
-    
+
     updateUserManagementUsers: builder.mutation<any, { id: string; payload: any }>({
       query: ({ id, payload }) => ({
         url: `/User/MobileUserUpdate/${id}`,   // <-- plural "users"

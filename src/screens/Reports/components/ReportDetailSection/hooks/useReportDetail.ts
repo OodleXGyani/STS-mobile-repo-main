@@ -9,7 +9,7 @@ import {
 } from '../../../../../services/vehicles';
 import { ReportType } from '../../../../../constants/reportTypes';
 import { useGenerateReport } from '../utils/generateReportService';
-import { formatDateRangeForAPI, formatDateForAPI } from '../../../../../utils/dateFormatter';
+import { formatDateRangeForAPI, formatDateForAPI, formatDateToISO } from '../../../../../utils/dateFormatter';
 import { useNavigation } from '@react-navigation/native';
 import { generateWeeksForMonth, WeekInfo } from '../utils/weekGenerator';
 
@@ -26,31 +26,26 @@ export const useReportDetail = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedVehicles, setSelectedVehicles] = useState<VehicleItem[]>([]);
-  const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>(
-    {},
-  );
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const navigation = useNavigation();
 
   // Year and month selection for monthly summary reports
   const [selectedYear, setSelectedYear] = useState<number>(() => {
     const currentDate = new Date();
-    const currentMonth = currentDate.getMonth() + 1; // Current month (1-12)
-    // If current month is January, we need to go back to previous year for December
+    const currentMonth = currentDate.getMonth() + 1;
     return currentMonth === 1 ? currentDate.getFullYear() - 1 : currentDate.getFullYear();
   });
   const [selectedMonth, setSelectedMonth] = useState<number>(() => {
-    const currentMonth = new Date().getMonth() + 1; // Current month (1-12)
-    // Set to one month before current month, or December if current month is January
+    const currentMonth = new Date().getMonth() + 1;
     return currentMonth === 1 ? 12 : currentMonth - 1;
   });
 
-  // Week selection state - only one week at a time
+  // Week selection state
   const [selectedWeek, setSelectedWeek] = useState<WeekInfo | null>(null);
   const [expandedWeeks, setExpandedWeeks] = useState<boolean>(false);
 
-  const { generateReport, states } = useGenerateReport(); // 👈 here
-  // Pagination states for user vehicles
+  const { generateReport, states } = useGenerateReport();
   const [pageIndex, setPageIndex] = useState(1);
   const pageSize = 10;
 
@@ -76,7 +71,7 @@ export const useReportDetail = () => {
     }, [])
   );
 
-  // Call the RTK Query to get user vehicles with default params
+  // Call the RTK Query to get user vehicles
   const {
     data: userVehicleResponse,
     error: userVehiclesError,
@@ -85,97 +80,119 @@ export const useReportDetail = () => {
     isSuccess: userVehiclesSuccess,
   } = useGetUserVehiclesQuery({
     pageIndex: 1,
-    pageSize: 1000, // Get all vehicles in one call
+    pageSize: 1000,
     searchText: '',
   });
 
-  // Use vehicle groups directly from backend response - only after success
+  // Extract groups directly from backend response
   const vehicleGroups: VehicleGroup[] = useMemo(() => {
-    if (!userVehiclesSuccess) return [];
-
-    // Handle new grouped format
-    if (userVehicleResponse?.groups && Array.isArray(userVehicleResponse.groups)) {
-      console.log('✅ Using grouped format from API:', userVehicleResponse.groups);
-      return userVehicleResponse.groups;
+    if (!userVehiclesSuccess || !userVehicleResponse) {
+      console.log('🚗 [useReportDetail] Waiting for response');
+      return [];
     }
 
-    // Handle old flat format - transform it to grouped format
-    if (userVehicleResponse?.items && Array.isArray(userVehicleResponse.items)) {
-      console.log('🔄 Converting old items format to grouped format...');
+    console.log('🚗 [useReportDetail] Raw response:', userVehicleResponse);
+    console.log('🚗 [useReportDetail] Response type:', typeof userVehicleResponse, 'is Array:', Array.isArray(userVehicleResponse));
 
-      // Group vehicles by their vehicleGroup field (or 'Ungrouped' if none)
-      const groupMap = new Map<string, VehicleItem[]>();
+    let groupsArray: any[] = [];
+
+    // Format 1: Wrapped object with "groups" field (pre-grouped from backend)
+    if ('groups' in userVehicleResponse && Array.isArray(userVehicleResponse.groups)) {
+      console.log('✅ [useReportDetail] Using wrapped groups format:', userVehicleResponse.groups.length, 'groups');
+      groupsArray = userVehicleResponse.groups;
+    }
+    // Format 2: Direct array of groups with "name" field (pre-grouped from backend)
+    else if (Array.isArray(userVehicleResponse)) {
+      console.log('✅ [useReportDetail] Direct array format detected:', userVehicleResponse.length, 'groups');
+      groupsArray = userVehicleResponse;
+    }
+    // Format 3: Wrapped response with "data" field containing groups
+    else if ('data' in userVehicleResponse && Array.isArray(userVehicleResponse.data)) {
+      console.log('✅ [useReportDetail] Using data field format:', userVehicleResponse.data.length, 'groups');
+      groupsArray = userVehicleResponse.data;
+    }
+    // Format 4: Flat vehicles list that needs to be grouped by vehicle type (typeName or typeId)
+    else if ('items' in userVehicleResponse && Array.isArray(userVehicleResponse.items)) {
+      console.log('✅ [useReportDetail] Detected items array format with', userVehicleResponse.items.length, 'vehicles');
+
+      // Group vehicles by their type using typeName (preferred) or typeId (fallback)
+      const vehiclesMap = new Map<string, any[]>();
 
       userVehicleResponse.items.forEach((vehicle: any) => {
-        const groupName = vehicle.vehicleGroup || vehicle.brand || 'Ungrouped';
+        // Apply grouping rule: typeName > typeId > "Unknown Type"
+        const groupName =
+          vehicle.typeName ??
+          (vehicle.typeId ? `Type ${vehicle.typeId}` : 'Unknown Type');
 
-        if (!groupMap.has(groupName)) {
-          groupMap.set(groupName, []);
+        if (!vehiclesMap.has(groupName)) {
+          vehiclesMap.set(groupName, []);
         }
-
-        const transformedVehicle: VehicleItem = {
-          id: vehicle.id,
-          vehicle_type: vehicle.type || 'Standard',
-          vehicle_model: vehicle.makeModelId || null,
-          vehicle_number: vehicle.number,
-          vehicle_name: vehicle.alias || vehicle.number,
-          device: {
-            device_name: vehicle.number,
-          },
-        };
-
-        groupMap.get(groupName)!.push(transformedVehicle);
+        vehiclesMap.get(groupName)!.push(vehicle);
       });
 
-      // Convert map to grouped format
+      // Convert map to array of groups
       let groupId = 1;
-      const groups: VehicleGroup[] = Array.from(groupMap).map(([groupName, vehicles]) => ({
+      groupsArray = Array.from(vehiclesMap.entries()).map(([groupName, vehicles]) => ({
+        name: groupName,
         group_id: groupId++,
-        group_name: groupName,
-        vehicle_count: vehicles.length,
         vehicles: vehicles,
       }));
 
-      console.log('✅ Transformed to grouped format:', groups);
-      return groups;
+      console.log('✅ [useReportDetail] Grouped items by vehicle type:', Array.from(vehiclesMap.keys()).map(k => `${k}(${vehiclesMap.get(k)!.length})`).join(', '));
+    }
+    // Format 5: Response with direct vehicles list
+    else if ('vehicles' in userVehicleResponse && Array.isArray(userVehicleResponse.vehicles)) {
+      console.log('✅ [useReportDetail] Using vehicles field format');
+      groupsArray = [{ name: 'All Vehicles', vehicles: userVehicleResponse.vehicles }];
+    }
+    else {
+      console.warn('⚠️ [useReportDetail] Unexpected response format:', userVehicleResponse);
+      console.warn('Available keys:', Object.keys(userVehicleResponse));
+      return [];
     }
 
-    // Fallback for completely empty response
-    console.warn('⚠️ Response has neither groups nor items field:', userVehicleResponse);
-    return [];
-  }, [userVehiclesSuccess, userVehicleResponse]);
+    // Transform groups to VehicleGroup format
+    let groupId = 1;
+    const result = groupsArray.map((group: any) => {
+      const transformedVehicles: VehicleItem[] = (group.vehicles || []).map((v: any) => ({
+        id: v.id,
+        vehicle_type: v.vehicle_type || 'Other',
+        vehicle_model: v.vehicle_model || null,
+        vehicle_number: v.vehicle_Number || v.vehicle_number || 'N/A',
+        vehicle_name: v.vehicle_name || 'N/A',
+        alias: v.alias || undefined,
+        device: {
+          device_name: v.device_name || 'N/A',
+        },
+        typeName: v.typeName || undefined,
+        typeId: v.typeId || undefined,
+      }));
 
-  // Debug log
-  if (userVehiclesSuccess) {
-    console.log('🚗 Vehicles query state:', {
-      isLoading: userVehiclesLoading,
-      isFetching: userVehiclesFetching,
-      isSuccess: userVehiclesSuccess,
-      hasResponse: !!userVehicleResponse,
-      responseKeys: userVehicleResponse ? Object.keys(userVehicleResponse) : [],
-      hasGroups: !!userVehicleResponse?.groups,
-      hasItems: !!userVehicleResponse?.items,
-      itemsLength: (userVehicleResponse?.items as any[])?.length ?? 0,
-      groupsLength: (userVehicleResponse?.groups as any[])?.length ?? 0,
-      vehicleGroupsLength: vehicleGroups.length,
-      error: userVehiclesError,
-      fullResponse: userVehicleResponse,
+      return {
+        group_id: groupId++,
+        // Use group_name if available, otherwise fallback to name
+        group_name: group.group_name || group.name || 'Unknown',
+        vehicle_count: transformedVehicles.length,
+        vehicles: transformedVehicles,
+      };
     });
-  }
 
+    console.log('📊 [useReportDetail] Final vehicle groups:', result.length, 'groups');
+    return result;
+  }, [userVehiclesSuccess, userVehicleResponse]);
 
   // Generate weeks for the selected month and year
   const availableWeeks = useMemo(() => {
     return generateWeeksForMonth(selectedYear, selectedMonth);
   }, [selectedYear, selectedMonth]);
-  // Handle accordion group toggle
-  const handleGroupToggle = useCallback((groupId: number) => {
+
+  const handleGroupToggle = useCallback((groupKey: string) => {
     setExpandedGroups(prev => ({
       ...prev,
-      [groupId]: !prev[groupId],
+      [groupKey]: !prev[groupKey],
     }));
   }, []);
-  // Handle vehicle selection with 5 vehicle limit
+
   const handleVehicleToggle = useCallback((vehicle: VehicleItem) => {
     setSelectedVehicles(prev => {
       const isSelected = prev.some(v => v.id === vehicle.id);
@@ -195,50 +212,37 @@ export const useReportDetail = () => {
     });
   }, []);
 
-  // Handle date selection
   const handleDateConfirm = useCallback((date: Date) => {
     setSelectedDate(date);
     setShowDatePicker(false);
   }, []);
 
-  // Handle year selection for monthly summary
   const handleYearChange = useCallback((year: number) => {
     setSelectedYear(year);
   }, []);
 
-  // Handle month selection for monthly summary
   const handleMonthChange = useCallback((month: number) => {
     setSelectedMonth(month);
-    // Clear selected week when month changes
     setSelectedWeek(null);
   }, []);
 
-  // Handle week selection - only one week at a time
   const handleWeekToggle = useCallback((week: WeekInfo) => {
-    console.log(week, 'week');
     setSelectedWeek(prev => {
-      // If clicking the same week, deselect it
       if (prev && prev.id === week.id) {
         return null;
       }
-      // Otherwise, select the new week
       return week;
     });
-
-    // Set selectedDate to the week's start date for API usage
     setSelectedDate(week.startDate);
   }, []);
 
-  // Handle week accordion toggle
   const handleWeeksToggle = useCallback(() => {
     setExpandedWeeks(prev => !prev);
   }, []);
 
-  // Handle report generation
   const handleGenerateReport = useCallback(
     async (report: ReportType) => {
       console.log(selectedVehicles, 'selectedVehicles');
-      console.log('🚗 Vehicle IDs about to be sent:', selectedVehicles.map(v => ({ id: v.id, name: v.vehicle_name })));
       if (selectedVehicles.length === 0) {
         showSafeAlert(
           mountedRef,
@@ -248,7 +252,6 @@ export const useReportDetail = () => {
         return;
       }
 
-      // For Weekly Summary Report, check if a week is selected
       if (report === 'Weekly Summary Report' && !selectedWeek) {
         showSafeAlert(
           mountedRef,
@@ -258,50 +261,39 @@ export const useReportDetail = () => {
         return;
       }
 
-      // Set loading state
       setIsGeneratingReport(true);
 
       try {
         let startDate: string;
         let endDate: string;
 
-        // Special handling for different report types
         if (report === 'Weekly Summary Report') {
-          // For weekly summary: use the selected week's start and end dates
           if (selectedWeek) {
-            startDate = formatDateForAPI(selectedWeek.startDate, true);  // 12:00:00 AM
-            endDate = formatDateForAPI(selectedWeek.endDate, false);     // 11:59:59 PM
+            startDate = formatDateToISO(selectedWeek.startDate, true);
+            endDate = formatDateToISO(selectedWeek.endDate, false);
           } else {
-            // Fallback to selectedDate if no week selected
-            startDate = formatDateForAPI(selectedDate, true);
-            endDate = formatDateForAPI(selectedDate, false);
+            startDate = formatDateToISO(selectedDate, true);
+            endDate = formatDateToISO(selectedDate, false);
           }
         } else if (report === 'Monthly Summary Report' || report === 'Vehicle Scoring Report') {
-          // For monthly summary: use selected year and month
-          const startDateObj = new Date(selectedYear, selectedMonth - 1, 1); // First day of month
-          const endDateObj = new Date(selectedYear, selectedMonth, 0); // Last day of month
+          const startDateObj = new Date(selectedYear, selectedMonth - 1, 1);
+          const endDateObj = new Date(selectedYear, selectedMonth, 0);
 
-          startDate = formatDateForAPI(startDateObj, true);  // 12:00:00 AM
-          endDate = formatDateForAPI(endDateObj, false);     // 11:59:59 PM
+          startDate = formatDateForAPI(startDateObj, true);
+          endDate = formatDateForAPI(endDateObj, false);
         } else {
-          // For all other reports: use the same day (start and end of selected date)
           const { startDate: sameDayStart, endDate: sameDayEnd } = formatDateRangeForAPI(selectedDate);
           startDate = sameDayStart;
           endDate = sameDayEnd;
         }
 
-        console.log('📅 Report generation - Selected date:', selectedDate, 'Formatted dates:', { startDate, endDate });
-
         const result = await generateReport(
           report,
-          selectedVehicles.map(v => String(v.id)), // pass vehicle IDs as strings
-          startDate,  // Formatted start date
-          endDate,    // Formatted end date
+          selectedVehicles.map(v => String(v.id)),
+          startDate,
+          endDate,
         );
-        console.log('Report result:', result);
 
-        // Result is guaranteed valid from polling - polling only returns data when status = 'Completed'
-        // Keep this safety check as a last resort
         if (!result) {
           showSafeAlert(
             mountedRef,
@@ -311,7 +303,6 @@ export const useReportDetail = () => {
           return;
         }
 
-        // Navigate only if data exists
         const dateParams = {
           selectedDate: selectedDate.toISOString(),
           selectedYear,
@@ -321,63 +312,31 @@ export const useReportDetail = () => {
         };
 
         if (report === 'Trip Report') {
-          (navigation as any).navigate('TripReport', {
-            report: result,
-            ...dateParams
-          });
+          (navigation as any).navigate('TripReport', { report: result, ...dateParams });
         } else if (report === 'Monthly Summary Report') {
-          (navigation as any).navigate('MonthlySummaryReport', {
-            report: result,
-            ...dateParams
-          });
+          (navigation as any).navigate('MonthlySummaryReport', { report: result, ...dateParams });
         } else if (report === 'Weekly Summary Report') {
-          (navigation as any).navigate('WeeklySummaryReport', {
-            report: result,
-            ...dateParams
-          });
+          (navigation as any).navigate('WeeklySummaryReport', { report: result, ...dateParams });
         } else if (report === 'Daily Summary Report') {
-          (navigation as any).navigate('DailySummaryReport', {
-            report: result,
-            ...dateParams
-          });
+          (navigation as any).navigate('DailySummaryReport', { report: result, ...dateParams });
         } else if (report === 'Vehicle Scoring Report') {
-          (navigation as any).navigate('VehicleScoringReportList', {
-            data: result,
-            ...dateParams
-          });
+          (navigation as any).navigate('VehicleScoringReportList', { data: result, ...dateParams });
         } else if (report === 'Position Activity Report') {
-          (navigation as any).navigate('PositionActivityReportList', {
-            data: result,
-            ...dateParams
-          });
+          (navigation as any).navigate('PositionActivityReportList', { data: result, ...dateParams });
         } else if (report === 'Speed Violation Report') {
-          (navigation as any).navigate('SpeedVoilationReportList', {
-            data: result,
-            ...dateParams
-          });
+          (navigation as any).navigate('SpeedVoilationReportList', { data: result, ...dateParams });
         } else if (report === 'Geofence Polygon Report') {
-          (navigation as any).navigate('GeoFenceReportList', {
-            data: result,
-            ...dateParams
-          });
+          (navigation as any).navigate('GeoFenceReportList', { data: result, ...dateParams });
         }
-
-        // Alert.alert(
-        //   'Report Generated',
-        //   `Report for ${selectedVehicles.length} vehicle(s) generated successfully.`,
-        // );
-
       } catch (error) {
         console.error('Report generation failed:', error);
-
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
 
-        // Handle specific polling errors
         if (errorMsg.includes('timeout')) {
           showSafeAlert(
             mountedRef,
             'Generation Timeout',
-            'Report generation took too long (exceeded 40 seconds). Please try again.',
+            'Report generation took too long. Please try again.',
           );
         } else if (errorMsg.includes('No data found')) {
           showSafeAlert(
@@ -386,14 +345,12 @@ export const useReportDetail = () => {
             'No reports found for the selected dates and vehicles.',
           );
         } else if (errorMsg.includes('Report generation failed')) {
-          // Backend returned Failed status with error message
           showSafeAlert(
             mountedRef,
             'Generation Failed',
             errorMsg.replace('Report generation failed: ', ''),
           );
         } else {
-          // Other errors (network, validation, etc.)
           showSafeAlert(
             mountedRef,
             'Error',
@@ -401,14 +358,12 @@ export const useReportDetail = () => {
           );
         }
       } finally {
-        // Clear loading state
         setIsGeneratingReport(false);
       }
     },
-    [generateReport, selectedVehicles, selectedDate, selectedYear, selectedMonth],
+    [generateReport, selectedVehicles, selectedDate, selectedYear, selectedMonth, selectedWeek, navigation],
   );
 
-  // Reset selections
   const handleReset = useCallback(() => {
     setSearchQuery('');
     setSelectedVehicles([]);
@@ -428,9 +383,8 @@ export const useReportDetail = () => {
     setExpandedGroups({});
   }, []);
 
-  // Pagination handlers
   const handleNextPage = useCallback(() => {
-    const totalVehicles = userVehicleResponse?.total_vehicles ?? 0;
+    const totalVehicles = userVehicleResponse && 'total_vehicles' in userVehicleResponse ? userVehicleResponse.total_vehicles : 0;
     if (totalVehicles > pageIndex * pageSize) {
       setPageIndex(pageIndex + 1);
     }
@@ -443,7 +397,6 @@ export const useReportDetail = () => {
   }, [pageIndex]);
 
   return {
-    // States
     selectedDate,
     showDatePicker,
     searchQuery,
@@ -462,8 +415,6 @@ export const useReportDetail = () => {
     selectedWeek,
     expandedWeeks,
     availableWeeks,
-
-    // Actions
     setShowDatePicker,
     setSearchQuery,
     handleGroupToggle,

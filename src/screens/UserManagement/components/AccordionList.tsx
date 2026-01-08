@@ -10,7 +10,7 @@ const AccordionList: React.FC = () => {
   const navigation = useNavigation();
 
   const { data, isLoading, isError } = useGetUserManagementTreeListQuery();
-console.log(data,'userLists');
+  console.log(data, 'userLists');
   const toggleAccordion = (index: number) => {
     setOpenIndex(openIndex === index ? null : index);
   };
@@ -21,18 +21,33 @@ console.log(data,'userLists');
 
   // 🔹 Transform API response into Accordion format
   const transformData = (apiResponse: any[]) => {
-    if (!apiResponse) return [];
+    if (!apiResponse || !Array.isArray(apiResponse)) return [];
 
-    // New API response is already grouped by groups with users inside
-    return apiResponse.map((group) => ({
-      title: group.groupName,
-      data: group.users.map((user: any) => ({
-        id: user.id.toString(),
-        name: user.name,
-        email: user.email || "",
-        mobile: user.phoneNumber || "",
-      })),
-    }));
+    console.log('🔍 Raw API Response:', apiResponse);
+
+    // Separate groups and users
+    const groups = apiResponse.filter(item => item.groupOrUser === 'Group');
+    const users = apiResponse.filter(item => item.groupOrUser === 'User');
+
+    console.log('🔍 Groups:', groups);
+    console.log('🔍 Users:', users);
+
+    // Group users by their parentGroupId
+    return groups.map((group) => {
+      const groupUsers = users.filter(user => user.parentGroupId === group.id);
+
+      console.log(`🔍 Group "${group.name}" has ${groupUsers.length} users`);
+
+      return {
+        title: group.name,
+        data: groupUsers.map((user: any) => ({
+          id: user.id.toString(),
+          name: user.name,
+          email: user.email || "",
+          mobile: user.phone || "",
+        })),
+      };
+    });
   };
 
   const dataSets = transformData(data);

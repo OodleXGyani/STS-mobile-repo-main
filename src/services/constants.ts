@@ -17,20 +17,37 @@ export const API_BASE_URLS = {
 // API Endpoints
 export const API_ENDPOINTS = {
   // Authentication
- AUTH: {
-  LOGIN: '/auth/login', // ✅ NEW TEST AUTH
-  LOGOUT: '/auth/logout',
-}
-,
+  AUTH: {
+    LOGIN: '/auth/login', // ✅ NEW TEST AUTH
+    LOGOUT: '/auth/logout',
+  }
+  ,
 
   // Drivers
   DRIVERS: {
-    BASE: '/Drivers',
+    BASE: '/driver',
+    GET_BY_ID: '/driver/getbyid', // Keeping legacy if needed, but RESTful is /driver/{id}
     GET_PAGED: '/driver/paged',
-    CREATE: '/drivers/create',
-    UPDATE: '/drivers/update',
-    DELETE: '/drivers/delete',
-    GET_BY_ID: '/drivers/getbyid',
+
+    // NEW ENDPOINTS
+    GET_LICENSE: '/driver/license',
+    GET_TAGS: '/driver/tags',
+    GET_DELETED: '/driver/deleted',
+    GET_HISTORY: '/driver/driver-vehicle-history',
+    GET_SCORING_GROUP: '/driver/driver-scoring-group',
+
+    DELETE_ASSIGNED_VEHICLE: '/driver/delete-assigned-vehicle',
+    DELETE_SCORING_GROUP: '/driver/driver-scoring-group',
+    DELETE_DRIVER: '/driver',
+
+    CREATE_DRIVER: '/driver',
+    CREATE_SCORING_GROUP: '/driver/driver-scoring-group',
+
+    UPDATE_DRIVER: '/driver',
+    UNDELETE_DRIVER: '/driver/undelete-driver',
+    ASSIGN_TAG: '/driver/assign-tag',
+    ASSIGN_VEHICLE: '/driver/assign-vehicle',
+    UPDATE_SCORING_GROUP: '/driver/driver-scoring-group',
   },
 
   // Vehicles
@@ -61,8 +78,13 @@ export const API_ENDPOINTS = {
 
   // Geofences
   GEOFENCES: {
-    BASE: '/geofences',
-    SEARCH_POI: '/geofences/search_poi',
+    BASE: '/geofence',
+    SEARCH_POI: '/geofence/search_poi',
+    GET_CORDS: '/geofence/get_cords',
+    GET_BY_ID: '/geofence',
+    CREATE: '/geofence',
+    UPDATE: '/geofence',
+    DELETE: '/geofence',
   },
 
   // Reports

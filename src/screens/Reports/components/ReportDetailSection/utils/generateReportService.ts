@@ -344,20 +344,16 @@ export function useGenerateReport() {
 
       case REPORT_TYPES.WEEKLY_SUMMARY:
         {
-          // Use internal retry mechanism for weekly summary due to backend bug
-          const raw = await retryWeeklySummaryWithBackoff(
-            () => weeklySummary(payload as WeeklySummaryPayload).unwrap()
-          );
-          const normalized = normalizeReportResponse(raw);
+          console.log('📤 POST /report-requests (weekly summary):', { reportName: 'weekly', payload });
+          const postResponse = await weeklySummary(payload as WeeklySummaryPayload).unwrap();
+          const jobId = postResponse.id;
+          console.log('📥 POST response received:', { jobId, status: postResponse.status });
 
-          // Validate weekly summary has expected data before returning
-          if (!normalized || !normalized.WeeklySummaryModelList) {
-            throw new Error(
-              'Weekly summary report returned empty or invalid data. Please try again.'
-            );
-          }
+          // Poll for completion
+          const result = await pollReportCompletion(jobId);
+          console.log('✅ Polling complete, got final result');
 
-          return normalized;
+          return normalizeReportResponse(result);
         }
 
       case REPORT_TYPES.MONTHLY_SUMMARY:
