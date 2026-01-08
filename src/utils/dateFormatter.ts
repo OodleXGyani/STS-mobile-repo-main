@@ -142,3 +142,22 @@ export const formatDateToISO = (date: Date, isStartOfDay: boolean = true): strin
   // Strip milliseconds from ISO string: "2026-01-06T00:00:00.000Z" → "2026-01-06T00:00:00Z"
   return targetDate.toISOString().replace(/\.\d{3}Z$/, 'Z');
 };
+
+/**
+ * Formats a Date object to ISO 8601 format WITHOUT the Z suffix
+ * Preserves the actual time of the date (does not force to start/end of day)
+ * @param date - JavaScript Date object
+ * @returns ISO 8601 string: YYYY-MM-DDTHH:mm:ss (without Z or milliseconds)
+ *
+ * Example: new Date("2026-01-06T11:33:42") → "2026-01-06T11:33:42"
+ */
+export const formatDateToISOWithoutZ = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+};

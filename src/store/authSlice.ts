@@ -152,6 +152,8 @@ export const selectUserPermissions = (state: { auth: AuthState }) =>
   state.auth.user?.permissions || [];
 export const selectShortKey = (state: { auth: AuthState }) =>
   state.auth.user?.short_key;
+export const selectCustomerId = (state: { auth: AuthState }) =>
+  state.auth.user?.customer_id;
 
 // ===== UTILITY FUNCTIONS =====
 export const hasPermission = (

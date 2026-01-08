@@ -45,6 +45,15 @@ export const useReportDetail = () => {
   const [selectedWeek, setSelectedWeek] = useState<WeekInfo | null>(null);
   const [expandedWeeks, setExpandedWeeks] = useState<boolean>(false);
 
+  // Vehicle Scoring Report scoring weights state
+  const [scoringWeights, setScoringWeights] = useState({
+    f1_OverSpeeding: 0,
+    f2_ExcessOverSpeeding: 0,
+    f3_SeatBeltViolation: 0,
+    f4_HarshCornering: 0,
+    f5_HarshBraking: 0,
+  });
+
   const { generateReport, states } = useGenerateReport();
   const [pageIndex, setPageIndex] = useState(1);
   const pageSize = 10;
@@ -241,7 +250,7 @@ export const useReportDetail = () => {
   }, []);
 
   const handleGenerateReport = useCallback(
-    async (report: ReportType) => {
+    async (report: ReportType, scoringWeightsParam?: typeof scoringWeights) => {
       console.log(selectedVehicles, 'selectedVehicles');
       if (selectedVehicles.length === 0) {
         showSafeAlert(
@@ -307,6 +316,7 @@ export const useReportDetail = () => {
           selectedVehicles.map(v => String(v.id)),
           startDate,
           endDate,
+          scoringWeightsParam ?? scoringWeights,
         );
 
         if (!result) {
@@ -382,7 +392,7 @@ export const useReportDetail = () => {
         setIsGeneratingReport(false);
       }
     },
-    [generateReport, selectedVehicles, selectedDate, selectedYear, selectedMonth, selectedWeek, navigation],
+    [generateReport, selectedVehicles, selectedDate, selectedYear, selectedMonth, selectedWeek, navigation, scoringWeights],
   );
 
   const handleReset = useCallback(() => {
@@ -436,6 +446,8 @@ export const useReportDetail = () => {
     selectedWeek,
     expandedWeeks,
     availableWeeks,
+    scoringWeights,
+    setScoringWeights,
     setShowDatePicker,
     setSearchQuery,
     handleGroupToggle,

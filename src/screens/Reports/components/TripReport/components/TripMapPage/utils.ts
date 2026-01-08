@@ -49,29 +49,56 @@ export const getRouteParams = (route: any): { tripData: TripMapData; title: stri
  * Calculate map region based on trip path coordinates
  */
 export const calculateMapRegion = (tripData: TripMapData): MapRegion => {
-  if (tripData.path.coordinates.length === 0) {
+  if (!tripData?.path?.coordinates || tripData.path.coordinates.length === 0) {
+    console.warn('🗺️ No coordinates found, using default Bahrain region');
     return BAHRAIN_REGION; // Default region from dashboard constants
   }
 
-  // Calculate bounds from trip coordinates
-  const coordinates = tripData.path.coordinates;
-  const latitudes = coordinates.map(coord => coord.latitude);
-  const longitudes = coordinates.map(coord => coord.longitude);
-  
-  const minLat = Math.min(...latitudes);
-  const maxLat = Math.max(...latitudes);
-  const minLng = Math.min(...longitudes);
-  const maxLng = Math.max(...longitudes);
-  
-  const latDelta = (maxLat - minLat) * 1.3; // Add 30% padding for better view
-  const lngDelta = (maxLng - minLng) * 1.3;
-  
-  return {
-    latitude: (minLat + maxLat) / 2,
-    longitude: (minLng + maxLng) / 2,
-    latitudeDelta: Math.max(latDelta, 0.01), // Minimum zoom level
-    longitudeDelta: Math.max(lngDelta, 0.01),
-  };
+  try {
+    // Filter out any invalid coordinates
+    const validCoordinates = tripData.path.coordinates.filter(
+      coord => coord &&
+      typeof coord.latitude === 'number' &&
+      typeof coord.longitude === 'number' &&
+      !isNaN(coord.latitude) &&
+      !isNaN(coord.longitude)
+    );
+
+    if (validCoordinates.length === 0) {
+      console.warn('🗺️ No valid coordinates found, using default Bahrain region');
+      return BAHRAIN_REGION;
+    }
+
+    // Calculate bounds from trip coordinates
+    const latitudes = validCoordinates.map(coord => coord.latitude);
+    const longitudes = validCoordinates.map(coord => coord.longitude);
+
+    const minLat = Math.min(...latitudes);
+    const maxLat = Math.max(...latitudes);
+    const minLng = Math.min(...longitudes);
+    const maxLng = Math.max(...longitudes);
+
+    // Handle case where all coordinates are the same point
+    let latDelta = (maxLat - minLat) * 1.3; // Add 30% padding for better view
+    let lngDelta = (maxLng - minLng) * 1.3;
+
+    // If delta is too small or zero, use a default zoom level
+    if (latDelta < 0.001) latDelta = 0.1;
+    if (lngDelta < 0.001) lngDelta = 0.1;
+
+    const region = {
+      latitude: (minLat + maxLat) / 2,
+      longitude: (minLng + maxLng) / 2,
+      latitudeDelta: Math.max(latDelta, 0.01), // Minimum zoom level
+      longitudeDelta: Math.max(lngDelta, 0.01),
+    };
+
+    console.log('🗺️ Map region calculated:', region);
+    return region;
+  } catch (error) {
+    console.error('🗺️ Error calculating map region:', error);
+    return BAHRAIN_REGION;
+  }
 };
 
 /**
@@ -103,102 +130,149 @@ export const formatDuration = (seconds: number): string => {
 export const transformApiDataToTripMapData = (apiData: any): TripMapData => {
   if (!apiData || !Array.isArray(apiData) || apiData.length === 0) {
     console.warn('🗺️ No valid API data provided, using fallback');
+    console.log('🗺️ API data received:', apiData);
     return getRouteParams({}).tripData;
   }
 
-  // Extract vehicle info from first data point
-  const firstPoint = apiData[0];
-  const vehicleName = firstPoint.Vehicle || 'Unknown Vehicle';
-  
-  // Transform coordinates to TripLocation format
-  const coordinates = apiData.map((point: any, index: number) => ({
-    latitude: point.Y, // Note: Y is latitude in the API data
-    longitude: point.X, // Note: X is longitude in the API data
-    timestamp: `${Math.floor(index / 60)}:${(index % 60).toString().padStart(2, '0')} AM`,
-    address: `${point.Status} - Speed: ${point.Speed} km/h`,
-    speed: point.Speed,
-    heading: point.SpeedAngle,
-  }));
+  try {
+    // Extract vehicle info from first data point
+    const firstPoint = apiData[0];
+    const vehicleName = firstPoint.Vehicle || 'Unknown Vehicle';
 
-  // Create markers from coordinates
-  const markers = [];
-  if (coordinates.length > 0) {
-    // Start marker
-    markers.push({
-      id: 'start',
-      type: 'start' as const,
-      coordinate: {
-        latitude: coordinates[0].latitude,
-        longitude: coordinates[0].longitude,
-      },
-      title: 'Trip Start',
-      description: `Started at ${coordinates[0].address}`,
-      timestamp: coordinates[0].timestamp,
-      address: coordinates[0].address,
-      speed: coordinates[0].speed,
-      heading: coordinates[0].heading,
-    });
+    console.log('🗺️ Transforming API data with', apiData.length, 'points');
+    console.log('🗺️ First point:', firstPoint);
 
-    // End marker
-    if (coordinates.length > 1) {
-      const lastPoint = coordinates[coordinates.length - 1];
-      markers.push({
-        id: 'end',
-        type: 'end' as const,
-        coordinate: {
-          latitude: lastPoint.latitude,
-          longitude: lastPoint.longitude,
-        },
-        title: 'Trip End',
-        description: `Ended at ${lastPoint.address}`,
-        timestamp: lastPoint.timestamp,
-        address: lastPoint.address,
-        speed: lastPoint.speed,
-        heading: lastPoint.heading,
-      });
+    // Transform coordinates to TripLocation format
+    const coordinates = apiData
+      .filter((point: any) => {
+        // Validate that Y (latitude) and X (longitude) are valid numbers
+        const hasValidLat = point?.Y !== undefined && point?.Y !== null && !isNaN(point.Y);
+        const hasValidLng = point?.X !== undefined && point?.X !== null && !isNaN(point.X);
+        return hasValidLat && hasValidLng;
+      })
+      .map((point: any, index: number) => ({
+        latitude: parseFloat(point.Y), // Note: Y is latitude in the API data
+        longitude: parseFloat(point.X), // Note: X is longitude in the API data
+        timestamp: point.Time ? formatTimeFromAPI(point.Time) : `${Math.floor(index / 60)}:${(index % 60).toString().padStart(2, '0')} AM`,
+        address: point.Status ? `${point.Status} - Speed: ${point.Speed} km/h` : `Point ${index + 1}`,
+        speed: parseFloat(point.Speed) || 0,
+        heading: parseFloat(point.SpeedAngle) || 0,
+      }));
+
+    if (coordinates.length === 0) {
+      console.warn('🗺️ No valid coordinates after filtering, using fallback');
+      return getRouteParams({}).tripData;
     }
-  }
 
-  // Calculate metrics from the data
-  const speeds = apiData.map(point => point.Speed).filter(speed => speed > 0);
-  const maxSpeed = speeds.length > 0 ? Math.max(...speeds) : 0;
-  const totalDistance = calculateTotalDistance(coordinates);
-  const totalTime = apiData.length * 60; // Assuming 1 minute intervals
+    console.log('🗺️ Valid coordinates extracted:', coordinates.length);
 
-  return {
-    tripId: `trip_${Date.now()}`,
-    vehicle: {
-      id: vehicleName,
-      plateNumber: vehicleName,
-      type: 'Light',
+    // Create markers from coordinates
+    const markers = [];
+    if (coordinates.length > 0) {
+      // Start marker
+      markers.push({
+        id: 'start',
+        type: 'start' as const,
+        coordinate: {
+          latitude: coordinates[0].latitude,
+          longitude: coordinates[0].longitude,
+        },
+        title: 'Trip Start',
+        description: `Started at ${coordinates[0].address}`,
+        timestamp: coordinates[0].timestamp,
+        address: coordinates[0].address,
+        speed: coordinates[0].speed,
+        heading: coordinates[0].heading,
+      });
+
+      // End marker
+      if (coordinates.length > 1) {
+        const lastPoint = coordinates[coordinates.length - 1];
+        markers.push({
+          id: 'end',
+          type: 'end' as const,
+          coordinate: {
+            latitude: lastPoint.latitude,
+            longitude: lastPoint.longitude,
+          },
+          title: 'Trip End',
+          description: `Ended at ${lastPoint.address}`,
+          timestamp: lastPoint.timestamp,
+          address: lastPoint.address,
+          speed: lastPoint.speed,
+          heading: lastPoint.heading,
+        });
+      }
+    }
+
+    // Calculate metrics from the data
+    const speeds = apiData
+      .map((point: any) => parseFloat(point.Speed))
+      .filter(speed => !isNaN(speed) && speed > 0);
+    const maxSpeed = speeds.length > 0 ? Math.max(...speeds) : 0;
+    const totalDistance = calculateTotalDistance(coordinates);
+    const totalTime = apiData.length * 60; // Assuming 1 minute intervals
+
+    const result = {
+      tripId: `trip_${Date.now()}`,
+      vehicle: {
+        id: vehicleName,
+        plateNumber: vehicleName,
+        type: 'Light',
+        status: 'completed' as const,
+      },
+      driver: {
+        id: 'driver_1',
+        name: 'Driver',
+      },
+      startTime: coordinates[0]?.timestamp || 'N/A',
+      endTime: coordinates[coordinates.length - 1]?.timestamp || 'N/A',
+      startLocation: coordinates[0]?.address || 'N/A',
+      endLocation: coordinates[coordinates.length - 1]?.address || 'N/A',
+      markers,
+      path: {
+        id: `path_${Date.now()}`,
+        coordinates,
+        color: '#007AFF',
+        strokeWidth: 4,
+      },
+      metrics: {
+        totalDistance,
+        totalTime,
+        idleTime: 0,
+        maxSpeed,
+        averageSpeed: speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0,
+        stopTime: 0,
+        numberOfStops: 0,
+      },
       status: 'completed' as const,
-    },
-    driver: {
-      id: 'driver_1',
-      name: 'Driver',
-    },
-    startTime: coordinates[0]?.timestamp || 'N/A',
-    endTime: coordinates[coordinates.length - 1]?.timestamp || 'N/A',
-    startLocation: coordinates[0]?.address || 'N/A',
-    endLocation: coordinates[coordinates.length - 1]?.address || 'N/A',
-    markers,
-    path: {
-      id: `path_${Date.now()}`,
-      coordinates,
-      color: '#007AFF',
-      strokeWidth: 4,
-    },
-    metrics: {
-      totalDistance,
-      totalTime,
-      idleTime: 0,
-      maxSpeed,
-      averageSpeed: speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0,
-      stopTime: 0,
-      numberOfStops: 0,
-    },
-    status: 'completed' as const,
-  };
+    };
+
+    console.log('🗺️ Transformation complete. Markers:', result.markers.length, 'Coordinates:', result.path.coordinates.length);
+    return result;
+  } catch (error) {
+    console.error('🗺️ Error transforming API data:', error);
+    return getRouteParams({}).tripData;
+  }
+};
+
+/**
+ * Format time from API response
+ */
+const formatTimeFromAPI = (time: string | undefined): string => {
+  if (!time) return 'Unknown';
+  try {
+    const date = new Date(time);
+    if (isNaN(date.getTime())) return time;
+
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  } catch {
+    return time;
+  }
 };
 
 /**

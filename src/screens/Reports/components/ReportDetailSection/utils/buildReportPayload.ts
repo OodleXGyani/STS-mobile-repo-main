@@ -201,6 +201,14 @@ export function buildReportPayload(
   selectedVehicles: string[],
   startDate: string,
   endDate?: string,
+  customerId?: string | number,
+  scoringWeights?: {
+    f1_OverSpeeding?: number;
+    f2_ExcessOverSpeeding?: number;
+    f3_SeatBeltViolation?: number;
+    f4_HarshCornering?: number;
+    f5_HarshBraking?: number;
+  },
 ):
   | DailySummaryPayload
   | WeeklySummaryPayload
@@ -380,14 +388,49 @@ export function buildReportPayload(
       return positionPayload;
 
     case REPORT_TYPES.SPEED_VIOLATION:
-      return {
-        StartDate: startDate,
-        EndDate: endDate ?? startDate,
-        ReportType: 'overspeedkm',
-        InputValue: '70',
-        Items: vehicleIds,  // Array of integer IDs for Int32[]
-        DataType: 'Vehicle',
+      // Speed Violation expects ISO 8601 format per API spec
+      // Format can be:
+      // - Already ISO 8601: "2025-11-06T00:00:00Z" (from formatDateToISO)
+      // - SmartTrack: "#11/06/2025 12:00:00 AM#" (legacy, convert if needed)
+
+      const isSpeedViolationStartTimeISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(startDate);
+      const speedViolationStartTime = isSpeedViolationStartTimeISO
+        ? startDate
+        : convertSmartTrackToISO8601(startDate);
+
+      const isSpeedViolationEndTimeISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(endDate ?? startDate);
+      const speedViolationEndTime = isSpeedViolationEndTimeISO
+        ? (endDate ?? startDate)
+        : convertSmartTrackToISO8601(endDate ?? startDate);
+
+      const speedViolationPayload = {
+        startTime: speedViolationStartTime,        // ISO 8601 format: "2025-11-06T00:00:00Z"
+        endTime: speedViolationEndTime,            // ISO 8601 format: "2025-11-07T23:59:00Z"
+        items: vehicleIds,                         // Array of integer vehicle IDs
+        reportType: 'vehicle' as const,            // Backend expects 'vehicle'
+        excludeGeofence: false,                    // Include geofence data by default
+        filterTypes: [],                           // Empty filter types array
+        enteredSpeed: 0,                           // Entered speed default value
+        excessLimit: 0,                            // Excess limit default value
+        excessLimitPercent: 0,                     // Excess limit percentage default value
       };
+
+      console.log('✅ [SPEED_VIOLATION] ISO 8601 dates prepared:', {
+        originalStartDate: startDate,
+        isSpeedViolationStartTimeISO,
+        speedViolationStartTime,
+        originalEndDate: endDate,
+        isSpeedViolationEndTimeISO,
+        speedViolationEndTime,
+        vehicleIds,
+        excludeGeofence: speedViolationPayload.excludeGeofence,
+        filterTypes: speedViolationPayload.filterTypes,
+        enteredSpeed: speedViolationPayload.enteredSpeed,
+        excessLimit: speedViolationPayload.excessLimit,
+        excessLimitPercent: speedViolationPayload.excessLimitPercent,
+      });
+
+      return speedViolationPayload;
 
     case REPORT_TYPES.HARSH_VIOLATION:
       return {
@@ -398,22 +441,86 @@ export function buildReportPayload(
       };
 
     case REPORT_TYPES.VEHICLE_SCORING:
-      return {
-        scoreDate: startDate,
-        vehicle: selectedVehicles.join(','),  // Comma-separated vehicle IDs
-        f1_OverSpeeding: 1,
-        f2_ExcessOverSpeeding: 1,
-        f3_SeatBleatViolation: 1,
-        f4_HarshCornering: 1,
-        f5_HarshBraking: 1,
+      // Vehicle Scoring expects ISO 8601 format with date range per API spec
+      // Format can be:
+      // - Already ISO 8601: "2025-11-06T00:00:00Z" (from formatDateToISO)
+      // - SmartTrack: "#11/06/2025 12:00:00 AM#" (legacy, convert if needed)
+
+      const isScoringStartTimeISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(startDate);
+      const scoringStartTime = isScoringStartTimeISO
+        ? startDate
+        : convertSmartTrackToISO8601(startDate);
+
+      const isScoringEndTimeISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(endDate ?? startDate);
+      const scoringEndTime = isScoringEndTimeISO
+        ? (endDate ?? startDate)
+        : convertSmartTrackToISO8601(endDate ?? startDate);
+
+      const scoringPayload = {
+        startTime: scoringStartTime,                // ISO 8601 format: "2025-11-06T00:00:00Z"
+        endTime: scoringEndTime,                    // ISO 8601 format: "2025-11-07T23:59:00Z"
+        items: vehicleIds,                          // Array of integer vehicle IDs
+        reportType: 'vehicle' as const,             // Backend expects 'vehicle'
+        excludeGeofence: false,                     // Include geofence data
+        F1_OverSpeeding: scoringWeights?.f1_OverSpeeding ?? 0,           // Default: 0 (configurable)
+        F2_ExcessOverSpeeding: scoringWeights?.f2_ExcessOverSpeeding ?? 0, // Default: 0 (configurable)
+        F3_SeatBeltViolation: scoringWeights?.f3_SeatBeltViolation ?? 0,  // Default: 0 (configurable) - FIXED typo: SeatBelt
+        F4_HarshCornering: scoringWeights?.f4_HarshCornering ?? 0,        // Default: 0 (configurable)
+        F5_HarshBraking: scoringWeights?.f5_HarshBraking ?? 0,            // Default: 0 (configurable)
       };
 
+      console.log('✅ [VEHICLE_SCORING] ISO 8601 dates prepared:', {
+        originalStartDate: startDate,
+        isScoringStartTimeISO,
+        scoringStartTime,
+        originalEndDate: endDate,
+        isScoringEndTimeISO,
+        scoringEndTime,
+        vehicleIds,
+        excludeGeofence: scoringPayload.excludeGeofence,
+        scoringWeights: scoringPayload,
+      });
+
+      return scoringPayload;
+
     case REPORT_TYPES.GEOFENCE_POLYGON:
-      return {
-        StartDate: startDate,
-        EndDate: endDate ?? startDate,
-        Vehicle: selectedVehicles[0],  // Single vehicle ID
+      // Geofence Polygon Report expects ISO 8601 format per API spec
+      // Format can be:
+      // - Already ISO 8601: "2025-11-06T00:00:00Z" (from formatDateToISO)
+      // - SmartTrack: "#11/06/2025 12:00:00 AM#" (legacy, convert if needed)
+
+      const isGeofenceStartTimeISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(startDate);
+      const geofenceStartTime = isGeofenceStartTimeISO
+        ? startDate
+        : convertSmartTrackToISO8601(startDate);
+
+      const isGeofenceEndTimeISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(endDate ?? startDate);
+      const geofenceEndTime = isGeofenceEndTimeISO
+        ? (endDate ?? startDate)
+        : convertSmartTrackToISO8601(endDate ?? startDate);
+
+      const geofencePayload = {
+        startTime: geofenceStartTime,     // ISO 8601 format: "2025-11-06T00:00:00Z"
+        endTime: geofenceEndTime,         // ISO 8601 format: "2025-11-07T23:59:00Z"
+        items: vehicleIds,                // Array of integer vehicle IDs
+        reportType: 'vehicle' as const,   // Backend expects 'vehicle'
+        excludeGeofence: false,           // Include geofence data by default
+        customerId: customerId ? parseInt(String(customerId), 10) : 0, // Convert to number
       };
+
+      console.log('✅ [GEOFENCE_POLYGON] ISO 8601 dates prepared:', {
+        originalStartDate: startDate,
+        isGeofenceStartTimeISO,
+        geofenceStartTime,
+        originalEndDate: endDate,
+        isGeofenceEndTimeISO,
+        geofenceEndTime,
+        vehicleIds,
+        customerId: geofencePayload.customerId,
+        excludeGeofence: geofencePayload.excludeGeofence,
+      });
+
+      return geofencePayload;
 
     case REPORT_TYPES.VEHICLE_PATH:
       return {

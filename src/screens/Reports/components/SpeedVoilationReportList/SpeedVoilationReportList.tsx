@@ -39,6 +39,9 @@ const SpeedVoilationReportList: React.FC = () => {
   const speedvoilationData = (route.params as { data?: any })?.data;
   const { startDate, endDate } = route.params as { startDate: string, endDate: string };
 
+  // The data coming from generateReportService is the result array directly
+  const violationsList = Array.isArray(speedvoilationData) ? speedvoilationData : [];
+
   const renderItem = ({ item }: { item: any }) => (
     <ItemContainer>
       <RightContainer>
@@ -64,7 +67,7 @@ const SpeedVoilationReportList: React.FC = () => {
               <Circle100Text>{item?.RoadSpeedLimit ?? '--'}</Circle100Text>
             </Circle100>
             <SpeedText>
-              {item?.Speed ? `${item.Speed} km/h` : 'Speed N/A'}
+              {item?.VehicleSpeed ? `${item.VehicleSpeed} km/h` : 'Speed N/A'}
             </SpeedText>
           </LeftContainer>
 
@@ -102,13 +105,7 @@ const SpeedVoilationReportList: React.FC = () => {
       <DetailsContainer>
         <FlatListHeader>Speed {'>'} 70 km/h</FlatListHeader>
 
-        {!speedvoilationData || !Array.isArray(speedvoilationData.SpeedData) ? (
-          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-            <Text style={{ color: '#666', fontSize: 16 }}>
-              No data available
-            </Text>
-          </View>
-        ) : speedvoilationData.SpeedData.length === 0 ? (
+        {!violationsList || violationsList.length === 0 ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
             <Text style={{ color: '#666', fontSize: 16 }}>
               No speed violations found
@@ -116,8 +113,8 @@ const SpeedVoilationReportList: React.FC = () => {
           </View>
         ) : (
           <FlatList
-            data={speedvoilationData.SpeedData}
-            keyExtractor={(item, index) => `${item?.id ?? 'no-id'}-${index}`}
+            data={violationsList}
+            keyExtractor={(item, index) => `${item?.Time ?? 'no-time'}-${index}`}
             renderItem={renderItem}
             ItemSeparatorComponent={() => (
               <FlatRow style={{ height: 1, backgroundColor: '#eee' }} />

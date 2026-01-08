@@ -73,20 +73,26 @@ export const baseQueryWithAuth: BaseQueryFn<
   unknown,
   FetchBaseQueryError
 > = async (args, api, extraOptions) => {
-  console.log('📤 API Request Args:', args);
-  console.log('🔗 Base URL:', getApiBaseUrl());
+  // Log URL-related requests with more detail
+  if (typeof args === 'object' && 'url' in args) {
+    console.log('📤 [baseQuery] API Request URL:', args.url);
+    console.log('📤 [baseQuery] Full Base URL:', getApiBaseUrl());
+    console.log('📤 [baseQuery] Full URL will be:', getApiBaseUrl() + args.url);
+  }
 
   // Log the request body if it's a POST/PATCH request
   if (typeof args === 'object' && 'body' in args && args.body) {
-    console.log('📋 Request Body:', JSON.stringify(args.body, null, 2));
+    console.log('📋 [baseQuery] Request Body:', JSON.stringify(args.body, null, 2));
   }
 
   const result = await rawBaseQuery(args, api, extraOptions);
 
-  console.log('📥 API Response:', {
-    status: result.meta?.response?.status,
-    url: result.meta?.response?.url,
-  });
+  console.log('📥 [baseQuery] API Response Status:', result.meta?.response?.status);
+  console.log('📥 [baseQuery] API Response URL:', result.meta?.response?.url);
+  console.log('📥 [baseQuery] Response Data:', result.data ? 'Present' : 'Null/Empty');
+  if (result.data) {
+    console.log('📥 [baseQuery] Response Data (first 500 chars):', JSON.stringify(result.data, null, 2).substring(0, 500));
+  }
 
   // =======================
   // HANDLE ERRORS

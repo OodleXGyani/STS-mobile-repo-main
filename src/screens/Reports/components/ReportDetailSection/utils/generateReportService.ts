@@ -7,6 +7,8 @@
  * - Error handling and propagation
  */
 
+import { useSelector } from 'react-redux';
+import { selectCustomerId } from '../../../../../store/authSlice';
 import { REPORT_TYPES, ReportType } from '../../../../../constants/reportTypes';
 import {
   useGetDailySummaryReportMutation,
@@ -226,6 +228,8 @@ async function pollReportCompletion(jobId: number): Promise<any> {
 }
 
 export function useGenerateReport() {
+  const customerId = useSelector(selectCustomerId);
+
   const [dailySummary, dailySummaryState] = useGetDailySummaryReportMutation();
   const [weeklySummary, weeklySummaryState] =
     useGetWeeklySummaryReportMutation();
@@ -331,6 +335,61 @@ export function useGenerateReport() {
   }
 
   /**
+   * Transforms geofence polygon report response to expected component format
+   *
+   * The API returns data in GeofenceData property, but GeoFenceReportList expects InPolygonData.
+   * This function maps: { GeofenceData: [...] } → { InPolygonData: [...] }
+   *
+   * @param response - Raw API response with GeofenceData property
+   * @returns Transformed response with InPolygonData property for UI consumption
+   */
+  function transformGeofencePolygonResponse(response: any): any {
+    console.log('🔄 [transformGeofencePolygonResponse] Starting transformation...');
+    console.log('🔄 [transformGeofencePolygonResponse] Input response type:', typeof response);
+    console.log('🔄 [transformGeofencePolygonResponse] Input response keys:',
+      response && typeof response === 'object' ? Object.keys(response) : 'N/A');
+
+    if (!response || typeof response !== 'object') {
+      console.warn('⚠️ [transformGeofencePolygonResponse] Invalid response - not an object');
+      return { InPolygonData: [] };
+    }
+
+    // Check if response has GeofenceData property
+    if (response.GeofenceData && Array.isArray(response.GeofenceData)) {
+      console.log(`✅ [transformGeofencePolygonResponse] Found GeofenceData with ${response.GeofenceData.length} records`);
+
+      if (response.GeofenceData.length > 0) {
+        console.log('📦 [transformGeofencePolygonResponse] First record sample:',
+          JSON.stringify(response.GeofenceData[0], null, 2).substring(0, 300));
+      }
+
+      // Transform: Map GeofenceData → InPolygonData
+      const transformed = {
+        InPolygonData: response.GeofenceData,
+      };
+
+      console.log('✅ [transformGeofencePolygonResponse] Transformation complete - ready for GeoFenceReportList');
+      return transformed;
+    }
+
+    // Check if it's already in the correct format
+    if (response.InPolygonData && Array.isArray(response.InPolygonData)) {
+      console.log(`✅ [transformGeofencePolygonResponse] Response already has InPolygonData (${response.InPolygonData.length} records)`);
+      return response;
+    }
+
+    // Check if it's a direct array (unlikely but handle it)
+    if (Array.isArray(response)) {
+      console.log(`📋 [transformGeofencePolygonResponse] Response is a direct array with ${response.length} records`);
+      return { InPolygonData: response };
+    }
+
+    console.warn('⚠️ [transformGeofencePolygonResponse] Unexpected response structure');
+    console.warn('Response keys:', Object.keys(response));
+    return { InPolygonData: [] };
+  }
+
+  /**
    * Normalizes API response by unwrapping nested data property
    * Handles both wrapped { data: {...} } and top-level responses
    *
@@ -377,6 +436,7 @@ export function useGenerateReport() {
    * @param selectedVehicles - IDs/names of vehicles to include
    * @param startDate - ISO-8601 formatted start date
    * @param endDate - ISO-8601 formatted end date (optional)
+   * @param scoringWeights - Optional scoring weights for vehicle scoring report
    * @returns Report data from API (normalized)
    * @throws ReportPayloadValidationError if payload validation fails
    * @throws API error if mutation fails
@@ -386,12 +446,21 @@ export function useGenerateReport() {
     selectedVehicles: string[],
     startDate: string,
     endDate?: string,
+    scoringWeights?: {
+      f1_OverSpeeding?: number;
+      f2_ExcessOverSpeeding?: number;
+      f3_SeatBeltViolation?: number;
+      f4_HarshCornering?: number;
+      f5_HarshBraking?: number;
+    },
   ) {
     const payload = buildReportPayload(
       reportType as ReportType,
       selectedVehicles,
       startDate,
       endDate,
+      customerId,
+      scoringWeights,
     );
 
     switch (reportType) {
@@ -617,7 +686,21 @@ export function useGenerateReport() {
           const result = await pollReportCompletion(jobId);
           console.log('✅ Polling complete, got final result');
 
-          return normalizeReportResponse(result);
+          // Normalize the response first (unwrap data property if present)
+          const normalizedResult = normalizeReportResponse(result);
+          console.log('🔍 [GEOFENCE_POLYGON] Normalized response type:', typeof normalizedResult);
+          console.log('🔍 [GEOFENCE_POLYGON] Normalized response keys:',
+            normalizedResult && typeof normalizedResult === 'object' ? Object.keys(normalizedResult) : 'N/A');
+
+          // Transform the geofence polygon response: API returns GeofenceData,
+          // but GeoFenceReportList component expects InPolygonData
+          const transformedResult = transformGeofencePolygonResponse(normalizedResult);
+          console.log('✅ [GEOFENCE_POLYGON] Transformation complete');
+          console.log('✅ [GEOFENCE_POLYGON] Final result has InPolygonData:', !!transformedResult.InPolygonData);
+          console.log('✅ [GEOFENCE_POLYGON] InPolygonData record count:',
+            transformedResult.InPolygonData ? transformedResult.InPolygonData.length : 0);
+
+          return transformedResult;
         }
 
       case REPORT_TYPES.VEHICLE_PATH:

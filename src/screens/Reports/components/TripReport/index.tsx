@@ -28,6 +28,7 @@ import {
   round_to,
   formatDateForAPI,
   formatDateForDisplay,
+  formatDateToISOWithoutZ,
 } from '../../../../utils';
 import { useGetVehiclePathReportMutation } from '../../../../services/reports';
 import {
@@ -341,38 +342,61 @@ export default function TripReport({ route }: { route: any }) {
   console.log('tripCards', tripCards);
 
   const handleMapPress = async (tripCard: any) => {
-    console.log('🗺️ Map button pressed for trip:', tripCard);
-    console.log('🗺️ TripCard properties:', {
+    console.log('🗺️ ========== MAP BUTTON PRESSED ==========');
+    console.log('🗺️ Trip data:', tripCard);
+    console.log('🗺️ Trip ID:', tripCard.Tripid);
+    console.log('🗺️ Vehicle:', tripCard.Vehicle);
+
+    const startDate = formatDateToISOWithoutZ(new Date(tripCard.StartTime));
+    const endDate = formatDateToISOWithoutZ(new Date(tripCard.EndTime));
+
+    console.log('🗺️ Payload:', {
       Vehicle: tripCard.Vehicle,
-      StartTime: formatDateForAPI(new Date(tripCard.StartTime), true),
-      EndTime: formatDateForAPI(new Date(tripCard.EndTime), false),
-      PlateNumber: tripCard.PlateNumber,
+      StartDate: startDate,
+      EndDate: endDate,
     });
 
     // Set loading state for this specific trip
     setLoadingTripId(tripCard.Tripid);
 
     try {
-      console.log('🗺️ About to call API...');
+      console.log('🗺️ Calling getVehiclePathReport mutation...');
       const response = await getVehiclePathReport({
         Vehicle: tripCard.Vehicle,
-        StartDate: formatDateForAPI(new Date(tripCard.StartTime), true),
-        EndDate: formatDateForAPI(new Date(tripCard.EndTime), false),
+        StartDate: startDate,
+        EndDate: endDate,
       });
-      console.log('🗺️ API Response:', response);
+
+      console.log('🗺️ ========== API RESPONSE RECEIVED ==========');
+      console.log('🗺️ Response object keys:', response ? Object.keys(response) : 'null');
+      console.log('🗺️ Response.data:', response?.data);
+      console.log('🗺️ Response.error:', response?.error);
+      console.log('🗺️ Full response:', JSON.stringify(response, null, 2));
+
       if (response.data) {
+        console.log('🗺️ ✅ Data received, navigating to TripMapPage...');
+        console.log('🗺️ Data type:', typeof response.data);
+        console.log('🗺️ Data is array?:', Array.isArray(response.data));
+        console.log('🗺️ Data length/keys:', Array.isArray(response.data) ? response.data.length : Object.keys(response.data || {}));
+
         (nav as any).navigate('TripMapPage', {
           tripData: response.data,
           title: `Trip Map - ${tripCard.Vehicle}`,
         });
       } else if (response.error) {
-        showSafeAlert(mountedRef, 'Error', 'An UnKnown Error Occured !');
+        console.error('🗺️ ❌ API returned an error:', response.error);
+        showSafeAlert(mountedRef, 'Error', `Failed to load map: ${JSON.stringify(response.error)}`);
+      } else {
+        console.error('🗺️ ❌ Invalid response structure');
+        showSafeAlert(mountedRef, 'Error', 'Invalid response from server');
       }
     } catch (error) {
-      console.error('🗺️ API error:', error);
+      console.error('🗺️ ❌ Exception during API call:', error);
+      showSafeAlert(mountedRef, 'Error', `Exception: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       // Clear loading state
       setLoadingTripId(null);
+      console.log('🗺️ ========== MAP BUTTON HANDLER COMPLETE ==========');
     }
   };
 

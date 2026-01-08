@@ -99,12 +99,15 @@ export interface PositionActivityPayload {
 }
 
 export interface SpeedViolationPayload {
-  StartDate: string;
-  EndDate: string;
-  ReportType: "overspeedkm" | "excesslimit_precentage" | "overspeed_and_excesslimit";
-  InputValue: string;
-  Items: string | number[];  // Can be comma-separated string or array of vehicle IDs
-  DataType: "Vehicle" | "Driver";
+  startTime: string;            // ISO 8601 format: "2025-11-06T00:00:00Z"
+  endTime: string;              // ISO 8601 format: "2025-11-07T23:59:00Z"
+  items: number[];              // Array of integer vehicle IDs
+  reportType: 'vehicle';        // Backend expects 'vehicle'
+  excludeGeofence: boolean;     // Include/exclude geofence data
+  filterTypes: string[];        // Filter types array
+  enteredSpeed: number;         // Entered speed value
+  excessLimit: number;          // Excess limit value
+  excessLimitPercent: number;   // Excess limit percentage value
 }
 
 export interface HarshViolationPayload {
@@ -115,19 +118,25 @@ export interface HarshViolationPayload {
 }
 
 export interface VehicleScoringPayload {
-  scoreDate: string;
-  vehicle: string;
-  f1_OverSpeeding: number;
-  f2_ExcessOverSpeeding: number;
-  f3_SeatBleatViolation: number;
-  f4_HarshCornering: number;
-  f5_HarshBraking: number;
+  startTime: string;                // ISO 8601 format: "2025-11-06T00:00:00Z"
+  endTime: string;                  // ISO 8601 format: "2025-11-07T23:59:00Z"
+  items: number[];                  // Array of integer vehicle IDs
+  reportType: 'vehicle';            // Backend expects 'vehicle'
+  excludeGeofence: boolean;         // Include/exclude geofence data
+  F1_OverSpeeding: number;          // Scoring weight for over-speeding (default: 5)
+  F2_ExcessOverSpeeding: number;    // Scoring weight for excess over-speeding (default: 2)
+  F3_SeatBeltViolation: number;     // Scoring weight for seatbelt violation (default: 3)
+  F4_HarshCornering: number;        // Scoring weight for harsh cornering (default: 4)
+  F5_HarshBraking: number;          // Scoring weight for harsh braking (default: 1)
 }
 
 export interface GeofencePolygonPayload {
-  StartDate: string;
-  EndDate: string;
-  Vehicle: string;
+  startTime: string;      // ISO 8601 format: "2025-11-06T00:00:00Z"
+  endTime: string;        // ISO 8601 format: "2025-11-07T23:59:00Z"
+  items: number[];        // Array of vehicle IDs
+  reportType: 'vehicle';  // Backend expects 'vehicle'
+  excludeGeofence: boolean;
+  customerId: number;
 }
 
 export interface VehiclePathPayload {
@@ -173,9 +182,14 @@ export interface PositionActivityResponse {
 }
 
 export interface SpeedViolationResponse {
-  data: {
-    SpeedViolationData: any[];
-  };
+  id: number;
+  status: 'Queued' | 'Processing' | 'Done' | 'Failed';
+  reportName: string;
+  result: any[];  // Array of speed violation records
+  errorMessage?: string;
+  startDate: string;
+  endDate: string;
+  vehicle?: any;
 }
 
 export interface HarshViolationResponse {
@@ -185,9 +199,11 @@ export interface HarshViolationResponse {
 }
 
 export interface VehicleScoringResponse {
-  data: {
-    VehicleScoringData: any[];
-  };
+  id: number;
+  status: 'Queued' | 'Processing' | 'Done' | 'Failed';
+  reportName: string;
+  result?: any[];  // Array of vehicle scoring records
+  errorMessage?: string;
 }
 
 export interface GeofencePolygonResponse {
@@ -380,12 +396,9 @@ export const reportsApi = api.injectEndpoints({
     // Vehicle Path Report
     getVehiclePathReport: builder.mutation<VehiclePathResponse, VehiclePathPayload>({
       query: (params) => ({
-        url: '/report-requests',
+        url: '/report-requests/vehicle/track-summary',
         method: "POST",
-        body: {
-          report_name: 'vehicle_path',
-          payload: params,
-        },
+        body: params,
       }),
     }),
     // Idle Report

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useRoute } from '@react-navigation/native';
+import { View, Text } from 'react-native';
 // Type imports
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import { moderateScale } from 'react-native-size-matters';
@@ -45,16 +46,19 @@ import {
  */
 const TripMapPage: React.FC = () => {
   const route = useRoute<TripMapPageRouteProp>();
-  
+
   // Get trip data from route parameters with fallback
   const { tripData, title = "Map" } = getRouteParams(route);
-  console.log('tripData', tripData);
-  
+  console.log('🗺️ [TripMapPage] Raw tripData:', tripData);
+  console.log('🗺️ [TripMapPage] tripData type:', typeof tripData);
+  console.log('🗺️ [TripMapPage] tripData is array?', Array.isArray(tripData));
+  console.log('🗺️ [TripMapPage] tripData length:', Array.isArray(tripData) ? tripData.length : 'N/A');
+
   // Transform API data to expected format
   const transformedTripData = transformApiDataToTripMapData(tripData);
-  console.log('transformedTripData', transformedTripData);
+  console.log('🗺️ [TripMapPage] transformedTripData:', transformedTripData);
+  console.log('🗺️ [TripMapPage] transformedTripData.path.coordinates length:', transformedTripData.path.coordinates.length);
 
-  
   // Debug logging
   logDebugInfo('TripMapPage rendered with params:', route.params);
   logDebugInfo('Trip data received:', tripData);
@@ -62,8 +66,12 @@ const TripMapPage: React.FC = () => {
   // Custom hooks for state management
   const { menuVisible, setMenuVisible, menuState, setMenuState } = useMapLayerState();
   const mapRegion = useMapRegion(transformedTripData);
+  console.log('🗺️ [TripMapPage] Map region:', mapRegion);
   const { handleBackPress } = useNavigationHandlers();
   const { handlePathPress } = usePathHandlers(transformedTripData);
+
+  // Show error state if no coordinates available
+  const hasCoordinates = transformedTripData?.path?.coordinates?.length > 0;
 
   return (
     <SafeAreaView style={SAFE_AREA_STYLE}>
@@ -79,13 +87,67 @@ const TripMapPage: React.FC = () => {
               }}
             />
           </BackButton>
-          
+
           <HeaderTitle>MAP</HeaderTitle>
-          
+
           <HeaderSpacer />
         </HeaderContainer>
 
+        {/* Error State - No Data */}
+        {!hasCoordinates && (
+          <View
+            style={{
+              flex: 1,
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: '#fff',
+              padding: moderateScale(20),
+            }}
+          >
+            <Text
+              style={{
+                fontSize: moderateScale(18),
+                fontWeight: 'bold',
+                color: Colors.primary_blue_color,
+                marginBottom: moderateScale(10),
+                textAlign: 'center',
+              }}
+            >
+              📍 No Map Data Available
+            </Text>
+            <Text
+              style={{
+                fontSize: moderateScale(14),
+                color: '#666',
+                textAlign: 'center',
+                marginBottom: moderateScale(20),
+              }}
+            >
+              No coordinates were returned from the server for this trip.
+            </Text>
+            <View
+              style={{
+                backgroundColor: '#f5f5f5',
+                padding: moderateScale(10),
+                borderRadius: moderateScale(5),
+                marginTop: moderateScale(10),
+              }}
+            >
+              <Text style={{ fontSize: moderateScale(11), color: '#666', fontFamily: 'monospace' }}>
+                Markers: {transformedTripData?.markers?.length || 0}
+              </Text>
+              <Text style={{ fontSize: moderateScale(11), color: '#666', fontFamily: 'monospace' }}>
+                Path Points: {transformedTripData?.path?.coordinates?.length || 0}
+              </Text>
+              <Text style={{ fontSize: moderateScale(11), color: '#666', fontFamily: 'monospace' }}>
+                Status: {transformedTripData?.status || 'unknown'}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Map Container */}
+        {hasCoordinates && (
         <MapContainer>
           {/* Layer selector button */}
           <LayerButton onPress={() => setMenuVisible(true)}>
@@ -114,6 +176,8 @@ const TripMapPage: React.FC = () => {
             showsBuildings={true}
             showsTraffic={menuState.showTraffic}
             showsIndoors={true}
+            onMapReady={() => console.log('🗺️ Map is ready')}
+            onError={(error) => console.error('🗺️ Map error:', error)}
           >
             {/* Render map layers */}
             {renderMapLayers(menuState)}
@@ -133,6 +197,7 @@ const TripMapPage: React.FC = () => {
             setMenuState={setMenuState}
           />
         </MapContainer>
+        )}
       </PageContainer>
     </SafeAreaView>
   );

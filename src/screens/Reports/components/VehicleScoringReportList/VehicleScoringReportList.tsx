@@ -34,13 +34,55 @@ const VehicleScoringReportList: React.FC = () => {
   };
   const [showInfoModal, setShowInfoModal] = useState(false);
 
-  const [data, setData] = useState(
-    vehicleScoringData.VehicleScoringList.map((item: any, index: number) => ({
+  // Handle both old format (wrapped in VehicleScoringList) and new format (direct array)
+  const getScoringDataArray = () => {
+    // New format: API returns array directly
+    if (Array.isArray(vehicleScoringData)) {
+      return vehicleScoringData;
+    }
+    // Old format: wrapped in object with VehicleScoringList property
+    if (vehicleScoringData?.VehicleScoringList && Array.isArray(vehicleScoringData.VehicleScoringList)) {
+      return vehicleScoringData.VehicleScoringList;
+    }
+    // Fallback: try data property
+    if (vehicleScoringData?.data && Array.isArray(vehicleScoringData.data)) {
+      return vehicleScoringData.data;
+    }
+    return [];
+  };
+
+  // Normalize API field names to component expected format
+  const normalizeItem = (item: any, index: number) => {
+    return {
       ...item,
+      // Map API field names (UPPER_SNAKE_CASE) to component expectations (camelCase)
+      Vehicle: item.Vehicle || item.VehicleNumber || `Vehicle ${index}`,
+      VehicleScore: item.VehicleScore ?? 0,
+      VehicleNumber: item.VehicleNumber || item.Vehicle,
+      TotalKm: item.TotalKm ?? 0,
+      IdleTime: item.IDLE_TIME ?? 0,
+      NoSpeedViolations: item.NO_SPEED_VIOLATIONS ?? 0,
+      NoSpeedAbove125: item.NO_SPEED_ABOVE125 ?? 0,
+      NoSeatbeltViolations: item.NO_SEATBELT_VIOLATIONS ?? 0,
+      NoHarshCornerings: item.NO_HARSH_CORNERINGS ?? 0,
+      SaftyScore: item.SaftyScore ?? 0,
+      NoOfStops: item.NO_OF_STOPS ?? 0,
+      NoHarshBreaks: item.NO_HARSH_BREAKS ?? 0,
+      NoHarshAccelerates: item.NO_HARSH_ACCELERATES ?? 0,
+      EcoScore: item.EcoScore ?? item.EFScore ?? 0,  // EcoScore or fallback to EFScore
       id: item.VehicleNumber || String(index),
       expanded: false,
-    })),
-  );
+    };
+  };
+
+  const [data, setData] = useState(() => {
+    const dataArray = getScoringDataArray();
+    if (!Array.isArray(dataArray) || dataArray.length === 0) {
+      console.warn('⚠️ [VehicleScoringReportList] No data available or invalid format');
+      return [];
+    }
+    return dataArray.map((item: any, index: number) => normalizeItem(item, index));
+  });
 
   const toggleExpand = (id: string) => {
     setData(prev =>

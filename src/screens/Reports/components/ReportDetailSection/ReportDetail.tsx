@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, ActivityIndicator, Text, View } from 'react-native';
+import { ScrollView, ActivityIndicator, Text, View, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import styled from 'styled-components/native';
@@ -43,6 +43,8 @@ const ReportDetail: React.FC = () => {
     selectedWeek,
     expandedWeeks,
     availableWeeks,
+    scoringWeights,
+    setScoringWeights,
     setShowDatePicker,
     setSearchQuery,
     handleGroupToggle,
@@ -126,7 +128,7 @@ const ReportDetail: React.FC = () => {
                 onYearChange={handleYearChange}
                 onMonthChange={handleMonthChange}
               />
-              
+
               {/* Week selection for Weekly Summary Report */}
               {report === 'Weekly Summary Report' && (
                 <WeekCheckbox
@@ -136,6 +138,113 @@ const ReportDetail: React.FC = () => {
                   onWeekToggle={handleWeekToggle}
                   onWeeksToggle={handleWeeksToggle}
                 />
+              )}
+
+              {/* Scoring Weights for Vehicle Scoring Report */}
+              {report === 'Vehicle Scoring Report' && (
+                <ScoringWeightsSection>
+                  <SectionLabel>Scoring Weights</SectionLabel>
+                  <ScoringWeightsNote>
+                    Adjust the weight for each violation type (higher values = higher impact on score)
+                  </ScoringWeightsNote>
+
+                  <ScoringWeightsGrid>
+                    <ScoringWeightInputGroup>
+                      <ScoringWeightLabel>F1: Over-Speeding</ScoringWeightLabel>
+                      <ScoringWeightInput
+                        placeholder="5"
+                        value={String(scoringWeights.f1_OverSpeeding)}
+                        onChangeText={(value) => {
+                          const numValue = parseInt(value, 10);
+                          if (!isNaN(numValue) && numValue >= 0) {
+                            setScoringWeights(prev => ({
+                              ...prev,
+                              f1_OverSpeeding: numValue,
+                            }));
+                          }
+                        }}
+                        keyboardType="numeric"
+                        maxLength={3}
+                      />
+                    </ScoringWeightInputGroup>
+
+                    <ScoringWeightInputGroup>
+                      <ScoringWeightLabel>F2: Excess Over-Speeding</ScoringWeightLabel>
+                      <ScoringWeightInput
+                        placeholder="2"
+                        value={String(scoringWeights.f2_ExcessOverSpeeding)}
+                        onChangeText={(value) => {
+                          const numValue = parseInt(value, 10);
+                          if (!isNaN(numValue) && numValue >= 0) {
+                            setScoringWeights(prev => ({
+                              ...prev,
+                              f2_ExcessOverSpeeding: numValue,
+                            }));
+                          }
+                        }}
+                        keyboardType="numeric"
+                        maxLength={3}
+                      />
+                    </ScoringWeightInputGroup>
+
+                    <ScoringWeightInputGroup>
+                      <ScoringWeightLabel>F3: Seatbelt Violation</ScoringWeightLabel>
+                      <ScoringWeightInput
+                        placeholder="3"
+                        value={String(scoringWeights.f3_SeatBeltViolation)}
+                        onChangeText={(value) => {
+                          const numValue = parseInt(value, 10);
+                          if (!isNaN(numValue) && numValue >= 0) {
+                            setScoringWeights(prev => ({
+                              ...prev,
+                              f3_SeatBeltViolation: numValue,
+                            }));
+                          }
+                        }}
+                        keyboardType="numeric"
+                        maxLength={3}
+                      />
+                    </ScoringWeightInputGroup>
+
+                    <ScoringWeightInputGroup>
+                      <ScoringWeightLabel>F4: Harsh Cornering</ScoringWeightLabel>
+                      <ScoringWeightInput
+                        placeholder="4"
+                        value={String(scoringWeights.f4_HarshCornering)}
+                        onChangeText={(value) => {
+                          const numValue = parseInt(value, 10);
+                          if (!isNaN(numValue) && numValue >= 0) {
+                            setScoringWeights(prev => ({
+                              ...prev,
+                              f4_HarshCornering: numValue,
+                            }));
+                          }
+                        }}
+                        keyboardType="numeric"
+                        maxLength={3}
+                      />
+                    </ScoringWeightInputGroup>
+
+                    <ScoringWeightInputGroup>
+                      <ScoringWeightLabel>F5: Harsh Braking</ScoringWeightLabel>
+                      <ScoringWeightInput
+                        placeholder="1"
+                        value={String(scoringWeights.f5_HarshBraking)}
+                        onChangeText={(value) => {
+                          const numValue = parseInt(value, 10);
+                          if (!isNaN(numValue) && numValue >= 0) {
+                            setScoringWeights(prev => ({
+                              ...prev,
+                              f5_HarshBraking: numValue,
+                            }));
+                          }
+                        }}
+                        keyboardType="numeric"
+                        maxLength={3}
+                      />
+                    </ScoringWeightInputGroup>
+                  </ScoringWeightsGrid>
+                </ScoringWeightsSection>
               )}
             </>
           ) : (
@@ -220,7 +329,7 @@ const ReportDetail: React.FC = () => {
       {/* Only show generate button if vehicles are available */}
       {vehicleGroups && vehicleGroups.length > 0 && (
         <GenerateReportButton
-          onPress={() => handleGenerateReport(report as ReportType)}
+          onPress={() => handleGenerateReport(report as ReportType, scoringWeights)}
           isGeneratingReport={isGeneratingReport}
         />
       )}
@@ -440,6 +549,52 @@ const VehicleLoadingText = styled.Text`
   font-size: ${moderateScale(16)}px;
   color: #666;
   text-align: center;
+`;
+
+const ScoringWeightsSection = styled.View`
+  background-color: #f9f9f9;
+  border-radius: ${scale(8)}px;
+  padding: ${verticalScale(16)}px ${scale(12)}px;
+  margin-bottom: ${verticalScale(16)}px;
+  border: 1px solid #e0e0e0;
+`;
+
+const SectionLabel = styled.Text`
+  font-size: ${moderateScale(16)}px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: ${verticalScale(8)}px;
+`;
+
+const ScoringWeightsNote = styled.Text`
+  font-size: ${moderateScale(13)}px;
+  color: #666;
+  margin-bottom: ${verticalScale(12)}px;
+  line-height: ${moderateScale(18)}px;
+`;
+
+const ScoringWeightsGrid = styled.View`
+  gap: ${verticalScale(12)}px;
+`;
+
+const ScoringWeightInputGroup = styled.View`
+  margin-bottom: ${verticalScale(4)}px;
+`;
+
+const ScoringWeightLabel = styled.Text`
+  font-size: ${moderateScale(13)}px;
+  font-weight: 500;
+  color: #555;
+  margin-bottom: ${verticalScale(6)}px;
+`;
+
+const ScoringWeightInput = styled.TextInput`
+  background-color: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: ${scale(6)}px;
+  padding: ${verticalScale(10)}px ${scale(12)}px;
+  font-size: ${moderateScale(14)}px;
+  color: #333;
 `;
 
 export default ReportDetail;
