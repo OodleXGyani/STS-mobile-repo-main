@@ -199,7 +199,7 @@ export default function DailySummaryReport() {
           {dailySummaryData.map((dailyData: any, index: number) =>
             renderDailySummaryCard({
               id: dailyData.Id || index + 1,
-              date: dailyData.SummaryDate || 'N/A',
+              date: formatDateForDisplay(dailyData.SummaryDate) || 'N/A',
               vehiclePlate: dailyData.VehicleName || 'N/A',
               vehicleType: dailyData.VehicleName || 'N/A',
               driverName: dailyData.DriverName || 'N/A',

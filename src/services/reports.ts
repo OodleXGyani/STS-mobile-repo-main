@@ -61,10 +61,10 @@ export interface GetReportResponse {
 
 // Specific report payload interfaces
 export interface DailySummaryPayload {
-  startDate: string;
-  endDate: string;
-  vehicle: string;
-  items: number[]; // Added to match backend expectation of a list
+  startDate: string;      // ISO 8601 format: "2025-11-06T00:00:00Z"
+  endDate: string;        // ISO 8601 format: "2025-11-07T23:59:00Z"
+  items: number[];        // Array of integer vehicle IDs
+  reportType: 'vehicle';  // Backend expects 'vehicle'
 }
 
 export interface WeeklySummaryPayload {
@@ -75,15 +75,19 @@ export interface WeeklySummaryPayload {
 }
 
 export interface MonthlySummaryPayload {
-  startDate: string;
-  vehicle: string;
+  startTime: string;            // ISO 8601 format: 2025-11-06T00:00:00Z
+  endTime: string;              // ISO 8601 format: 2025-11-07T23:59:00Z
+  items: number[];              // Array of integer vehicle IDs
+  reportType: 'vehicle';        // Backend expects 'vehicle'
+  excludeGeofence: boolean;     // Include/exclude geofence data
 }
 
 export interface TripSummaryPayload {
-  startDate: string;
-  endDate: string;
-  items: number[];  // Array of integer vehicle IDs (not comma-separated string)
-  datatype: "vehicle" | "driver";
+  startTime: string;            // ISO 8601 format: 2025-11-06T00:00:00Z
+  endTime: string;              // ISO 8601 format: 2025-11-07T23:59:00Z
+  items: number[];              // Array of integer vehicle IDs
+  reportType: 'vehicle';        // Backend expects 'vehicle'
+  excludeGeofence: boolean;     // Include/exclude geofence data
 }
 
 export interface PositionActivityPayload {
@@ -265,25 +269,47 @@ export const reportsApi = api.injectEndpoints({
     }),
     // Monthly Summary Report
     getMonthlySummaryReport: builder.mutation<MonthlySummaryResponse, MonthlySummaryPayload>({
-      query: (params) => ({
-        url: '/report-requests',
-        method: "POST",
-        body: {
-          report_name: 'monthly',
-          payload: params,
-        },
-      }),
+      query: (params) => {
+        // Backend expects: { report_name: "adv_monthly_report", payload: { reportType, startTime, endTime, items, excludeGeofence } }
+        const fullPayload = {
+          report_name: 'adv_monthly_report',
+          payload: {
+            reportType: params.reportType,     // Backend expects 'vehicle'
+            startTime: params.startTime,       // ISO 8601 format
+            endTime: params.endTime,           // ISO 8601 format
+            items: params.items,               // Array of vehicle IDs
+            excludeGeofence: params.excludeGeofence,  // Include/exclude geofence data
+          },
+        };
+        console.log('📤 Monthly Report POST /report-requests payload:', JSON.stringify(fullPayload, null, 2));
+        return {
+          url: '/report-requests',
+          method: "POST",
+          body: fullPayload,
+        };
+      },
     }),
     // Trip Summary Report
     getTripSummaryReport: builder.mutation<TripSummaryResponse, TripSummaryPayload>({
-      query: (params) => ({
-        url: '/report-requests',
-        method: "POST",
-        body: {
-          report_name: 'trip',
-          payload: params,
-        },
-      }),
+      query: (params) => {
+        // Backend expects: { report_name: "trip", payload: { startTime, endTime, items, reportType, excludeGeofence } }
+        const fullPayload = {
+          report_name: 'trip',  // Backend expects 'trip' for trip summary reports
+          payload: {
+            startTime: params.startTime,           // ISO 8601 format
+            endTime: params.endTime,               // ISO 8601 format
+            items: params.items,                   // Array of vehicle IDs
+            reportType: params.reportType,         // Backend expects 'vehicle'
+            excludeGeofence: params.excludeGeofence,
+          },
+        };
+        console.log('📤 Trip Report POST /report-requests payload:', fullPayload);
+        return {
+          url: '/report-requests',
+          method: "POST",
+          body: fullPayload,
+        };
+      },
     }),
     // Position Activity Report
     getPositionActivityReport: builder.mutation<PositionActivityResponse, PositionActivityPayload>({

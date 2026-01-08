@@ -11,7 +11,7 @@
 const EXISTING_REPORTS = {
   DAILY_SUMMARY: 'daily',
   WEEKLY_SUMMARY: 'weekly',
-  MONTHLY_SUMMARY: 'monthly',
+  MONTHLY_SUMMARY: 'adv_monthly_report',
   TRIP_REPORT: 'trip',
   POSITION_ACTIVITY: 'history',
   SPEED_VIOLATION: 'speed_violation',

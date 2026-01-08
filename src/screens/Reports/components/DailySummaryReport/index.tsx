@@ -13,7 +13,7 @@ import {
   Label,
   SubLabel,
 } from '../MonthlySummaryReport/MonthlyReportsStyles';
-import { toHHMM } from '../../../../utils';
+import { toHHMM, formatDateForDisplay } from '../../../../utils';
 import {
   DailySummaryCards,
   VehiclePlateContainer,
@@ -49,7 +49,7 @@ const dailyFleetStats: DailyFleetStats = {
 const dummyDailySummaryCards: DailySummaryCard[] = [
   {
     id: 1,
-    date: "2024-01-15",
+    date: "#01/15/2024 12:00:00 AM#",
     vehiclePlate: "MH 12 AB 1234",
     vehicleType: "MITSUBISHI_324578",
     driverName: "Ameer- Admin Driver",
@@ -75,7 +75,7 @@ const dummyDailySummaryCards: DailySummaryCard[] = [
   },
   {
     id: 2,
-    date: "2024-01-15",
+    date: "#01/15/2024 12:00:00 AM#",
     vehiclePlate: "MH 12 CD 5678",
     vehicleType: "MITSUBISHI_324578",
     driverName: "Nazar Alawi Al Sharkhat",
@@ -101,7 +101,7 @@ const dummyDailySummaryCards: DailySummaryCard[] = [
   },
   {
     id: 3,
-    date: "2024-01-15",
+    date: "#01/15/2024 12:00:00 AM#",
     vehiclePlate: "MH 12 EF 9012",
     vehicleType: "MITSUBISHI_324578",
     driverName: "Gufran Sdiddique",
@@ -127,7 +127,7 @@ const dummyDailySummaryCards: DailySummaryCard[] = [
   },
   {
     id: 4,
-    date: "2024-01-15",
+    date: "#01/15/2024 12:00:00 AM#",
     vehiclePlate: "MH 12 GH 3456",
     vehicleType: "MITSUBISHI_324578",
     driverName: "Ahmed Naji",
@@ -187,7 +187,7 @@ export default function DailySummaryReport() {
         </View>
         <View>
           <Text style={{fontSize:moderateScale(16),fontWeight:'bold',color:Colors.primary_blue_color}}>
-            {dailyData.date}
+            {formatDateForDisplay(dailyData.date)}
           </Text>
         </View>
       </View>

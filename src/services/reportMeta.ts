@@ -66,7 +66,7 @@ export const REPORT_META: Record<ReportName, ReportMetaConfig> = {
   monthly: {
     needsVehicleSelection: true,
     needsDateRange: false, // Only year and month
-    needsExcludeGeofence: false,
+    needsExcludeGeofence: true,
     needsScoringWeights: false,
     needsCustomerId: false,
     needsFilterTypes: false,

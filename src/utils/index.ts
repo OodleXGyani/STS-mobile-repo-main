@@ -1,37 +1,69 @@
 /**
  * Converts seconds to HH:MM:SS format
- * @param sec - seconds to convert
- * @returns formatted time string in HH:MM:SS format
+ * @param sec - seconds to convert (handles undefined/null gracefully)
+ * @returns formatted time string in HH:MM:SS format, or '00:00:00' if input is invalid
  */
-export const toHHMMSS = (sec: number | string): string => {
-    const sec_num = parseInt(sec.toString(), 10); // don't forget the second param
-    const hours = Math.floor(sec_num / 3600);
-    const minutes = Math.floor((sec_num - (hours * 3600)) / 60);
-    const seconds = sec_num - (hours * 3600) - (minutes * 60);
+export const toHHMMSS = (sec: number | string | undefined | null): string => {
+    // Handle undefined, null, or empty values
+    if (sec === undefined || sec === null || sec === '') {
+        return '00:00:00';
+    }
 
-    // Use padStart to ensure proper zero padding
-    const formattedHours = hours.toString().padStart(2, '0');
-    const formattedMinutes = minutes.toString().padStart(2, '0');
-    const formattedSeconds = seconds.toString().padStart(2, '0');
-    
-    return `${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
+    try {
+        const sec_num = parseInt(sec.toString(), 10);
+
+        // Handle NaN or invalid numbers
+        if (isNaN(sec_num)) {
+            return '00:00:00';
+        }
+
+        const hours = Math.floor(sec_num / 3600);
+        const minutes = Math.floor((sec_num - (hours * 3600)) / 60);
+        const seconds = sec_num - (hours * 3600) - (minutes * 60);
+
+        // Use padStart to ensure proper zero padding
+        const formattedHours = hours.toString().padStart(2, '0');
+        const formattedMinutes = minutes.toString().padStart(2, '0');
+        const formattedSeconds = seconds.toString().padStart(2, '0');
+
+        return `${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
+    } catch (error) {
+        console.warn('⚠️ [toHHMMSS] Failed to convert value:', sec, error);
+        return '00:00:00';
+    }
 };
 
 /**
  * Converts seconds to HH:MM format
- * @param sec - seconds to convert
- * @returns formatted time string in HH:MM format
+ * @param sec - seconds to convert (handles undefined/null gracefully)
+ * @returns formatted time string in HH:MM format, or '00:00' if input is invalid
  */
-export const toHHMM = (sec: number | string): string => {
-    const sec_num = parseInt(sec.toString(), 10); // don't forget the second param
-    const hours = Math.floor(sec_num / 3600);
-    const minutes = Math.floor((sec_num - (hours * 3600)) / 60);
+export const toHHMM = (sec: number | string | undefined | null): string => {
+    // Handle undefined, null, or empty values
+    if (sec === undefined || sec === null || sec === '') {
+        return '00:00';
+    }
 
-    // Use padStart to ensure proper zero padding
-    const formattedHours = hours.toString().padStart(2, '0');
-    const formattedMinutes = minutes.toString().padStart(2, '0');
-    
-    return `${formattedHours}:${formattedMinutes}`;
+    try {
+        const sec_num = parseInt(sec.toString(), 10);
+
+        // Handle NaN or invalid numbers
+        if (isNaN(sec_num)) {
+            return '00:00';
+        }
+
+        const hours = Math.floor(sec_num / 3600);
+        const minutes = Math.floor((sec_num - (hours * 3600)) / 60);
+
+        // Use padStart to ensure proper zero padding
+        const formattedHours = hours.toString().padStart(2, '0');
+        const formattedMinutes = minutes.toString().padStart(2, '0');
+
+        return `${formattedHours}:${formattedMinutes}`;
+    } catch (error) {
+        console.warn('⚠️ [toHHMM] Failed to convert value:', sec, error);
+        return '00:00';
+    }
 };
 
 /**

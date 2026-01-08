@@ -182,6 +182,13 @@ async function pollReportCompletion(jobId: number): Promise<any> {
       if (statusResponse.status === JobStatus.DONE) {
         console.log(`✅ Report job ${jobId} completed (status: ${statusResponse.status}). Extracting data...`);
         console.log('📦 Status Response Result:', statusResponse.result);
+        console.log('🔍 RESULT TYPE CHECK:', {
+          type: typeof statusResponse.result,
+          isArray: Array.isArray(statusResponse.result),
+          isObject: statusResponse.result !== null && typeof statusResponse.result === 'object',
+          keys: statusResponse.result && typeof statusResponse.result === 'object' ? Object.keys(statusResponse.result) : 'N/A',
+          structure: JSON.stringify(statusResponse.result, null, 2).substring(0, 500),
+        });
         // For non-array responses, return the result property
         // Empty array [] is a valid success
         return statusResponse.result;
@@ -238,52 +245,89 @@ export function useGenerateReport() {
   const [vehiclePath, vehiclePathState] = useGetVehiclePathReportMutation();
 
   /**
-   * Retry mechanism for weekly summary reports
+   * Transforms monthly report response array to expected component format
    *
-   * Backend issue: Throws NullReferenceException on first request,
-   * succeeds on second request. This is a known backend bug.
+   * The API returns an array of vehicle summaries, but the component expects:
+   * {
+   *   SummaryMonthlyData: [vehicles array],
+   *   MonthlyFleetStatistics: [fleet statistics]
+   * }
    *
-   * This logic is intentionally placed in the service layer (not UI components)
-   * to treat retries as business/transport logic, not presentation logic.
+   * This function calculates fleet-wide statistics from individual vehicle data.
    *
-   * @param mutationFn - The mutation function to retry
-   * @param maxAttempts - Maximum number of retry attempts
-   * @param delayMs - Delay between retries in milliseconds
-   * @returns Result from successful mutation call
-   * @throws Last error if all attempts fail
+   * @param vehicleDataArray - Array of vehicle summary objects from API
+   * @returns Transformed response with SummaryMonthlyData and MonthlyFleetStatistics
    */
-  async function retryWeeklySummaryWithBackoff(
-    mutationFn: () => Promise<any>,
-    maxAttempts: number = 2,
-    delayMs: number = 500
-  ): Promise<any> {
-    let lastError: any;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        const result = await mutationFn();
-        if (attempt > 1) {
-          console.log(`✅ Weekly summary succeeded on attempt ${attempt}`);
-        }
-        return result;
-      } catch (error) {
-        lastError = error;
-        if (attempt < maxAttempts) {
-          console.warn(
-            `⚠️ Weekly summary attempt ${attempt} failed, retrying...`,
-            error
-          );
-          // Wait before retrying
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-        } else {
-          // Final attempt failed, log and propagate
-          console.error(`❌ Weekly summary failed after ${maxAttempts} attempts`, error);
-        }
-      }
+  function transformMonthlyReportResponse(vehicleDataArray: any[]): any {
+    if (!Array.isArray(vehicleDataArray) || vehicleDataArray.length === 0) {
+      console.warn('⚠️ [transformMonthlyReportResponse] Invalid or empty vehicle data array');
+      return { SummaryMonthlyData: [], MonthlyFleetStatistics: [] };
     }
 
-    // All attempts exhausted, throw the last error
-    throw lastError;
+    console.log('🔄 [transformMonthlyReportResponse] Transforming monthly report response...');
+    console.log('📊 Vehicle count:', vehicleDataArray.length);
+
+    // Calculate fleet statistics from vehicle data
+    const vehicleCount = vehicleDataArray.length;
+
+    // Sum totals for mean calculations
+    let totalOperationTime = 0;
+    let totalIdleTime = 0;
+    let totalDistanceTravelled = 0;
+    let maxTotalOperationTime = 0;
+    let maxTotalIdleTime = 0;
+    let maxTotalDistanceTravelled = 0;
+
+    vehicleDataArray.forEach((vehicle: any) => {
+      totalOperationTime += vehicle.TotalOperationTime || 0;
+      totalIdleTime += vehicle.TotalIdleTime || 0;
+      totalDistanceTravelled += vehicle.TotalDistanceTravelled || 0;
+
+      maxTotalOperationTime = Math.max(maxTotalOperationTime, vehicle.TotalOperationTime || 0);
+      maxTotalIdleTime = Math.max(maxTotalIdleTime, vehicle.TotalIdleTime || 0);
+      maxTotalDistanceTravelled = Math.max(maxTotalDistanceTravelled, vehicle.TotalDistanceTravelled || 0);
+    });
+
+    // Calculate means
+    const meanOperationTime = Math.round(totalOperationTime / vehicleCount);
+    const meanIdleTime = Math.round(totalIdleTime / vehicleCount);
+    const meanDistanceTravelled = Math.round(totalDistanceTravelled / vehicleCount);
+    const meanTotalOperationTime = meanOperationTime;
+    const meanTotalIdleTime = meanIdleTime;
+    const meanTotalDistanceTravelled = meanDistanceTravelled;
+
+    console.log('📈 Calculated fleet statistics:', {
+      meanOperationTime,
+      meanIdleTime,
+      meanDistanceTravelled,
+      maxTotalOperationTime,
+      maxTotalIdleTime,
+      maxTotalDistanceTravelled,
+      meanTotalOperationTime,
+      meanTotalIdleTime,
+      meanTotalDistanceTravelled,
+    });
+
+    // Create the expected response structure
+    const transformedResponse = {
+      SummaryMonthlyData: vehicleDataArray,
+      MonthlyFleetStatistics: [
+        {
+          MeanOperationTime: meanOperationTime,
+          MeanIdleTime: meanIdleTime,
+          MeanDistanceTravelled: meanDistanceTravelled,
+          MaxTotalOperationTime: maxTotalOperationTime,
+          MaxTotalIdleTime: maxTotalIdleTime,
+          MaxTotalDistanceTravelled: maxTotalDistanceTravelled,
+          MeanTotalOperationTime: meanTotalOperationTime,
+          MeanTotalIdleTime: meanTotalIdleTime,
+          MeanTotalDistanceTravelled: meanTotalDistanceTravelled,
+        },
+      ],
+    };
+
+    console.log('✅ [transformMonthlyReportResponse] Transformation complete');
+    return transformedResponse;
   }
 
   /**
@@ -294,9 +338,32 @@ export function useGenerateReport() {
    * @returns Normalized response object
    */
   function normalizeReportResponse(response: any): any {
+    console.log('🔄 [normalizeReportResponse] Raw response type:', typeof response);
+    console.log('🔄 [normalizeReportResponse] Is array?', Array.isArray(response));
+
+    if (response === null || response === undefined) {
+      console.warn('⚠️ [normalizeReportResponse] Response is null/undefined');
+      return response;
+    }
+
+    // If response is an array, return as-is (direct trip data)
+    if (Array.isArray(response)) {
+      console.log('🔄 [normalizeReportResponse] Response is array, returning as-is');
+      return response;
+    }
+
     // If response has a 'data' property, unwrap it
+    if (response.data !== undefined) {
+      console.log('🔄 [normalizeReportResponse] Response has "data" property, unwrapping...');
+      console.log('🔄 [normalizeReportResponse] Unwrapped data type:', typeof response.data);
+      console.log('🔄 [normalizeReportResponse] Unwrapped data keys:', Object.keys(response.data || {}));
+      return response.data;
+    }
+
     // Otherwise return as-is
-    return response?.data ?? response;
+    console.log('🔄 [normalizeReportResponse] No "data" property, returning response as-is');
+    console.log('🔄 [normalizeReportResponse] Response object keys:', Object.keys(response || {}));
+    return response;
   }
 
   /**
@@ -344,26 +411,8 @@ export function useGenerateReport() {
 
       case REPORT_TYPES.WEEKLY_SUMMARY:
         {
-          // Use internal retry mechanism for weekly summary due to backend bug
-          const raw = await retryWeeklySummaryWithBackoff(
-            () => weeklySummary(payload as WeeklySummaryPayload).unwrap()
-          );
-          const normalized = normalizeReportResponse(raw);
-
-          // Validate weekly summary has expected data before returning
-          if (!normalized || !normalized.WeeklySummaryModelList) {
-            throw new Error(
-              'Weekly summary report returned empty or invalid data. Please try again.'
-            );
-          }
-
-          return normalized;
-        }
-
-      case REPORT_TYPES.MONTHLY_SUMMARY:
-        {
-          console.log('📤 POST /report-requests (monthly summary):', { reportName: 'monthly', payload });
-          const postResponse = await monthlySummary(payload as MonthlySummaryPayload).unwrap();
+          console.log('📤 POST /report-requests (weekly summary):', { reportName: 'weekly', payload });
+          const postResponse = await weeklySummary(payload as WeeklySummaryPayload).unwrap();
           const jobId = postResponse.id;
           console.log('📥 POST response received:', { jobId, status: postResponse.status });
 
@@ -374,10 +423,79 @@ export function useGenerateReport() {
           return normalizeReportResponse(result);
         }
 
+      case REPORT_TYPES.MONTHLY_SUMMARY:
+        {
+          const monthlyPayload = payload as MonthlySummaryPayload;
+          console.log('📤 POST /report-requests (monthly summary):', {
+            report_name: 'adv_monthly_report',
+            payload: {
+              reportType: monthlyPayload.reportType,
+              startTime: monthlyPayload.startTime,
+              endTime: monthlyPayload.endTime,
+              items: monthlyPayload.items,
+              excludeGeofence: monthlyPayload.excludeGeofence,
+            },
+          });
+          const postResponse = await monthlySummary(monthlyPayload).unwrap();
+          const jobId = postResponse.id;
+          console.log('📥 POST response received:', { jobId, status: postResponse.status });
+
+          // Poll for completion
+          const result = await pollReportCompletion(jobId);
+          console.log('✅ Polling complete, got final result');
+
+          // Transform the monthly report response: API returns array of vehicles,
+          // but component expects {SummaryMonthlyData, MonthlyFleetStatistics}
+          const normalizedResult = normalizeReportResponse(result);
+          console.log('🔍 Normalized result is array?', Array.isArray(normalizedResult));
+
+          if (Array.isArray(normalizedResult)) {
+            console.log('📊 Transforming array response to include fleet statistics...');
+            return transformMonthlyReportResponse(normalizedResult);
+          }
+
+          return normalizedResult;
+        }
+
       case REPORT_TYPES.TRIP_REPORT:
         {
-          console.log('📤 POST /report-requests (trip report):', { reportName: 'trip', payload });
-          const postResponse = await tripReport(payload as TripSummaryPayload).unwrap();
+          const tripPayload = payload as TripSummaryPayload;
+          console.log('📤 POST /report-requests (trip report):', {
+            report_name: 'trip',
+            startTime: tripPayload.startTime,
+            endTime: tripPayload.endTime,
+            items: tripPayload.items,
+            reportType: tripPayload.reportType,
+            excludeGeofence: tripPayload.excludeGeofence,
+          });
+
+          // Validate payload structure before sending
+          if (!tripPayload.items || !Array.isArray(tripPayload.items)) {
+            throw new Error('Invalid trip report payload: items must be an array of vehicle IDs');
+          }
+          if (tripPayload.items.length === 0) {
+            throw new Error('Invalid trip report payload: items array cannot be empty');
+          }
+          if (!tripPayload.startTime || typeof tripPayload.startTime !== 'string') {
+            throw new Error('Invalid trip report payload: startTime must be an ISO 8601 formatted date string');
+          }
+          if (!tripPayload.endTime || typeof tripPayload.endTime !== 'string') {
+            throw new Error('Invalid trip report payload: endTime must be an ISO 8601 formatted date string');
+          }
+          if (tripPayload.reportType !== 'vehicle') {
+            throw new Error(`Invalid trip report payload: reportType must be 'vehicle', got '${tripPayload.reportType}'`);
+          }
+
+          console.log('🔎 TRIP REPORT PAYLOAD DETAILS:', {
+            items: tripPayload.items,
+            itemsType: 'Array',
+            itemsLength: tripPayload.items.length,
+            startTime: tripPayload.startTime,
+            endTime: tripPayload.endTime,
+            reportType: tripPayload.reportType,
+            excludeGeofence: tripPayload.excludeGeofence,
+          });
+          const postResponse = await tripReport(tripPayload).unwrap();
           const jobId = postResponse.id;
           console.log('📥 POST response received:', { jobId, status: postResponse.status });
 

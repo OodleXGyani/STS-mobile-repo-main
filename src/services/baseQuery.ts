@@ -76,6 +76,11 @@ export const baseQueryWithAuth: BaseQueryFn<
   console.log('📤 API Request Args:', args);
   console.log('🔗 Base URL:', getApiBaseUrl());
 
+  // Log the request body if it's a POST/PATCH request
+  if (typeof args === 'object' && 'body' in args && args.body) {
+    console.log('📋 Request Body:', JSON.stringify(args.body, null, 2));
+  }
+
   const result = await rawBaseQuery(args, api, extraOptions);
 
   console.log('📥 API Response:', {
@@ -93,6 +98,14 @@ export const baseQueryWithAuth: BaseQueryFn<
       data: result.error.data || 'no data',
       message: 'message' in result.error ? result.error.message : 'no message',
     });
+
+    // Log detailed error response for debugging 500 errors
+    if ('status' in result.error && result.error.status === 500) {
+      console.error('🔴 500 Server Error Details:', {
+        fullData: result.error.data,
+        errorInfo: result.error,
+      });
+    }
 
     if ('status' in result.error) {
       if (result.error.status === 401) {

@@ -111,17 +111,34 @@ const todayRange = getTodayDateRangeForAPI();
 
 /**
  * Formats a Date object to ISO 8601 format (UTC) for newer API endpoints
- * @param date - JavaScript Date object
- * @param isStartOfDay - If true, sets time to 00:00:00 UTC, else 23:59:59 UTC
- * @returns ISO 8601 string: YYYY-MM-DDTHH:mm:ss.sssZ
+ * @param date - JavaScript Date object (in local timezone)
+ * @param isStartOfDay - If true, sets time to 00:00:00 UTC, else 23:59:00 UTC
+ * @returns ISO 8601 string: YYYY-MM-DDTHH:mm:ssZ (without milliseconds)
+ *
+ * NOTE: This function extracts the local date components (year, month, day)
+ * and creates a UTC date at midnight/end-of-day to avoid timezone shift issues.
+ * For example: selecting Jan 6 in EST timezone will result in 2026-01-06T00:00:00Z
+ * (not 2026-01-05T00:00:00Z which would happen if we just shifted local midnight to UTC)
+ *
+ * The milliseconds are stripped from the output per API specification.
  */
 export const formatDateToISO = (date: Date, isStartOfDay: boolean = true): string => {
-  const targetDate = new Date(date);
-  // Use UTC methods to ensure we get 00:00:00Z matching the date selected irrespective of local time
+  // Extract local date components to avoid timezone conversion issues
+  const year = date.getFullYear();
+  const month = date.getMonth();  // 0-based
+  const day = date.getDate();
+
+  // Create a new date using UTC directly with the extracted local date components
+  const targetDate = new Date(Date.UTC(year, month, day));
+
   if (isStartOfDay) {
+    // Already at 00:00:00 UTC when created with Date.UTC(year, month, day)
     targetDate.setUTCHours(0, 0, 0, 0);
   } else {
-    targetDate.setUTCHours(23, 59, 59, 999);
+    // Set to end of day: 23:59:00 per API spec (not 23:59:59)
+    targetDate.setUTCHours(23, 59, 0, 0);
   }
-  return targetDate.toISOString();
+
+  // Strip milliseconds from ISO string: "2026-01-06T00:00:00.000Z" → "2026-01-06T00:00:00Z"
+  return targetDate.toISOString().replace(/\.\d{3}Z$/, 'Z');
 };

@@ -267,7 +267,11 @@ export const useReportDetail = () => {
         let startDate: string;
         let endDate: string;
 
-        if (report === 'Weekly Summary Report') {
+        if (report === 'Daily Summary Report') {
+          // Daily Summary Report requires ISO 8601 format per API spec
+          startDate = formatDateToISO(selectedDate, true);
+          endDate = formatDateToISO(selectedDate, false);
+        } else if (report === 'Weekly Summary Report') {
           if (selectedWeek) {
             startDate = formatDateToISO(selectedWeek.startDate, true);
             endDate = formatDateToISO(selectedWeek.endDate, false);
@@ -275,7 +279,18 @@ export const useReportDetail = () => {
             startDate = formatDateToISO(selectedDate, true);
             endDate = formatDateToISO(selectedDate, false);
           }
-        } else if (report === 'Monthly Summary Report' || report === 'Vehicle Scoring Report') {
+        } else if (report === 'Position Activity Report' || report === 'Trip Report') {
+          // Position Activity Report and Trip Report require ISO 8601 format per API spec
+          startDate = formatDateToISO(selectedDate, true);
+          endDate = formatDateToISO(selectedDate, false);
+        } else if (report === 'Monthly Summary Report') {
+          // Monthly Summary Report requires ISO 8601 format per API spec
+          const startDateObj = new Date(selectedYear, selectedMonth - 1, 1);
+          const endDateObj = new Date(selectedYear, selectedMonth, 0);
+
+          startDate = formatDateToISO(startDateObj, true);
+          endDate = formatDateToISO(endDateObj, false);
+        } else if (report === 'Vehicle Scoring Report') {
           const startDateObj = new Date(selectedYear, selectedMonth - 1, 1);
           const endDateObj = new Date(selectedYear, selectedMonth, 0);
 
@@ -312,6 +327,12 @@ export const useReportDetail = () => {
         };
 
         if (report === 'Trip Report') {
+          console.log('🧭 [useReportDetail] Navigating to TripReport');
+          console.log('🧭 [useReportDetail] Result type:', typeof result);
+          console.log('🧭 [useReportDetail] Is result array?', Array.isArray(result));
+          console.log('🧭 [useReportDetail] Result keys:', Array.isArray(result) ? 'N/A (array)' : Object.keys(result || {}));
+          console.log('🧭 [useReportDetail] Full result object:', JSON.stringify(result, null, 2).substring(0, 500));
+          console.log('🧭 [useReportDetail] Navigation params:', { report: result, ...dateParams });
           (navigation as any).navigate('TripReport', { report: result, ...dateParams });
         } else if (report === 'Monthly Summary Report') {
           (navigation as any).navigate('MonthlySummaryReport', { report: result, ...dateParams });

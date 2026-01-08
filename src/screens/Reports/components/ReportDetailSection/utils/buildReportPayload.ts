@@ -121,8 +121,13 @@ function validateReportPayload(
   // Simple ISO 8601 regex check (YYYY-MM-DD...)
   const iso8601Regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
 
-  // Reports using ISO format: Weekly Summary & Position Activity
-  const usesIsoFormat = reportType === REPORT_TYPES.WEEKLY_SUMMARY || reportType === REPORT_TYPES.POSITION_ACTIVITY;
+  // Reports using ISO format: Daily Summary, Weekly Summary, Monthly Summary, Position Activity, & Trip Report
+  const usesIsoFormat =
+    reportType === REPORT_TYPES.DAILY_SUMMARY ||
+    reportType === REPORT_TYPES.WEEKLY_SUMMARY ||
+    reportType === REPORT_TYPES.MONTHLY_SUMMARY ||
+    reportType === REPORT_TYPES.POSITION_ACTIVITY ||
+    reportType === REPORT_TYPES.TRIP_REPORT;
 
   if (usesIsoFormat) {
     if (!iso8601Regex.test(startDate)) {
@@ -215,15 +220,49 @@ export function buildReportPayload(
   const vehicleIds = convertVehicleIdsToIntArray(selectedVehicles);
   console.log('🔄 Vehicle ID conversion:', { originalVehicleIds: selectedVehicles, convertedToIntArray: vehicleIds });
 
+  // Log validated inputs for debugging
+  console.log('✅ [buildReportPayload] Validation passed. Building payload:', {
+    reportType,
+    vehicleIds,
+    startDate,
+    endDate,
+  });
+
   // Report-specific payload building
   switch (reportType) {
     case REPORT_TYPES.DAILY_SUMMARY:
-      return {
-        startDate,
-        endDate: endDate ?? startDate,
-        vehicle: selectedVehicles[0],  // Single vehicle ID (Legacy/Fallback)
-        items: vehicleIds,             // Array of integer IDs for Int32[] (Fix for multi-vehicle)
+      // Daily Summary Report expects ISO 8601 format with startDate/endDate fields
+      // Format can be:
+      // - Already ISO 8601: "2025-11-06T00:00:00Z" (from formatDateToISO)
+      // - SmartTrack: "#11/06/2025 12:00:00 AM#" (legacy, convert if needed)
+
+      const isDailyStartDateISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(startDate);
+      const dailyStartDate = isDailyStartDateISO
+        ? startDate
+        : convertSmartTrackToISO8601(startDate);
+
+      const isDailyEndDateISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(endDate ?? startDate);
+      const dailyEndDate = isDailyEndDateISO
+        ? (endDate ?? startDate)
+        : convertSmartTrackToISO8601(endDate ?? startDate);
+
+      const dailyPayload = {
+        startDate: dailyStartDate,    // ISO 8601 format: "2025-11-06T00:00:00Z"
+        endDate: dailyEndDate,        // ISO 8601 format: "2025-11-07T23:59:00Z"
+        items: vehicleIds,            // Array of integer IDs
+        reportType: 'vehicle' as const, // Backend expects 'vehicle'
       };
+
+      console.log('✅ [DAILY_SUMMARY] ISO 8601 dates prepared:', {
+        originalStartDate: startDate,
+        isDailyStartDateISO,
+        dailyStartDate,
+        originalEndDate: endDate,
+        isDailyEndDateISO,
+        dailyEndDate,
+      });
+
+      return dailyPayload;
 
     case REPORT_TYPES.WEEKLY_SUMMARY:
       return {
@@ -234,34 +273,111 @@ export function buildReportPayload(
       };
 
     case REPORT_TYPES.MONTHLY_SUMMARY:
-      return {
-        startDate,
-        endDate: endDate ?? startDate,
-        vehicle: selectedVehicles.join(','),  // Comma-separated vehicle IDs
+      // Monthly Summary Report expects ISO 8601 format per API spec
+      // Format can be:
+      // - Already ISO 8601: "2025-11-06T00:00:00Z" (from formatDateToISO)
+      // - SmartTrack: "#11/06/2025 12:00:00 AM#" (legacy, convert if needed)
+
+      const isMonthlyStartTimeISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(startDate);
+      const monthlyStartTime = isMonthlyStartTimeISO
+        ? startDate
+        : convertSmartTrackToISO8601(startDate);
+
+      const isMonthlyEndTimeISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(endDate ?? startDate);
+      const monthlyEndTime = isMonthlyEndTimeISO
+        ? (endDate ?? startDate)
+        : convertSmartTrackToISO8601(endDate ?? startDate);
+
+      const monthlyPayload = {
+        startTime: monthlyStartTime,     // ISO 8601 format: "2025-11-06T00:00:00Z"
+        endTime: monthlyEndTime,         // ISO 8601 format: "2025-11-07T23:59:00Z"
+        items: vehicleIds,               // Array of integer IDs for vehicle selection
+        reportType: 'vehicle' as const,  // Backend expects 'vehicle'
+        excludeGeofence: false,          // Include geofence data
       };
+
+      console.log('✅ [MONTHLY_SUMMARY] ISO 8601 dates prepared:', {
+        originalStartDate: startDate,
+        isMonthlyStartTimeISO,
+        monthlyStartTime,
+        originalEndDate: endDate,
+        isMonthlyEndTimeISO,
+        monthlyEndTime,
+        vehicleIds,
+        excludeGeofence: monthlyPayload.excludeGeofence,
+      });
+
+      return monthlyPayload;
 
     case REPORT_TYPES.TRIP_REPORT:
-      return {
-        startDate,
-        endDate: endDate ?? startDate,
-        items: vehicleIds,  // Array of integer IDs for Int32[]
-        datatype: 'vehicle',
+      // Trip Report expects ISO 8601 format per API spec
+      // Format can be:
+      // - Already ISO 8601: "2025-11-06T00:00:00Z" (from formatDateToISO)
+      // - SmartTrack: "#11/06/2025 12:00:00 AM#" (legacy, convert if needed)
+
+      const isTripStartTimeISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(startDate);
+      const tripStartTime = isTripStartTimeISO
+        ? startDate
+        : convertSmartTrackToISO8601(startDate);
+
+      const isTripEndTimeISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(endDate ?? startDate);
+      const tripEndTime = isTripEndTimeISO
+        ? (endDate ?? startDate)
+        : convertSmartTrackToISO8601(endDate ?? startDate);
+
+      const tripPayload = {
+        startTime: tripStartTime,     // ISO 8601 format: "2025-11-06T00:00:00Z"
+        endTime: tripEndTime,         // ISO 8601 format: "2025-11-07T23:59:00Z"
+        items: vehicleIds,            // Array of integer IDs for vehicle selection
+        reportType: 'vehicle',        // Backend expects 'vehicle'
+        excludeGeofence: false,       // Default behavior: include geofence data
       };
 
-    case REPORT_TYPES.POSITION_ACTIVITY:
-      // Convert dates from SmartTrack format to ISO 8601 format
-      // SmartTrack: "#11/06/2025 12:00:00 AM#"
-      // ISO 8601: "2025-11-06T00:00:00Z"
-      const isoStartTime = convertSmartTrackToISO8601(startDate);
-      const isoEndTime = convertSmartTrackToISO8601(endDate ?? startDate);
+      console.log('✅ [TRIP_REPORT] ISO 8601 dates prepared:', {
+        originalStartDate: startDate,
+        isTripStartTimeISO,
+        tripStartTime,
+        originalEndDate: endDate,
+        isTripEndTimeISO,
+        tripEndTime,
+      });
 
-      return {
+      return tripPayload;
+
+    case REPORT_TYPES.POSITION_ACTIVITY:
+      // Position Activity expects ISO 8601 format
+      // Format can be:
+      // - Already ISO 8601: "2025-11-06T00:00:00Z" (from formatDateToISO)
+      // - SmartTrack: "#11/06/2025 12:00:00 AM#" (legacy, convert if needed)
+
+      const isStartTimeISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(startDate);
+      const isoStartTime = isStartTimeISO
+        ? startDate
+        : convertSmartTrackToISO8601(startDate);
+
+      const isEndTimeISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(endDate ?? startDate);
+      const isoEndTime = isEndTimeISO
+        ? (endDate ?? startDate)
+        : convertSmartTrackToISO8601(endDate ?? startDate);
+
+      const positionPayload = {
         startTime: isoStartTime,    // ISO 8601 format
         endTime: isoEndTime,        // ISO 8601 format
         items: vehicleIds,          // Array of integer IDs
         reportType: 'vehicle',      // Backend expects 'vehicle'
         excludeGeofence: false,     // Boolean false for default behavior
       };
+
+      console.log('✅ [POSITION_ACTIVITY] ISO 8601 dates prepared:', {
+        originalStartDate: startDate,
+        isStartTimeISO,
+        isoStartTime,
+        originalEndDate: endDate,
+        isEndTimeISO,
+        isoEndTime,
+      });
+
+      return positionPayload;
 
     case REPORT_TYPES.SPEED_VIOLATION:
       return {
