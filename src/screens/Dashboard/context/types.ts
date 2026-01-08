@@ -1,4 +1,19 @@
 // =======================
+// STATUS ENUM
+// =======================
+
+/**
+ * Vehicle status values as returned by the API
+ * These are the canonical status values used throughout the app
+ */
+export enum VehicleStatus {
+  MOVING = 'Moving',
+  IDLE = 'Idle',
+  OFF = 'Off',
+  NO_SIGNAL = 'NoSignal',
+}
+
+// =======================
 // CORE SHARED TYPES
 // =======================
 
@@ -16,96 +31,106 @@ export interface VehicleTypeSummary {
   no_vehicles: number;
 }
 
+/**
+ * StatusSummary matches the actual API response structure
+ * Fields: moving, idle, off, noSignal, filtered
+ * (not: on, longoff, overspeed, total)
+ */
 export interface StatusSummary {
-  on: number;
+  moving: number;
   idle: number;
   off: number;
-  longoff: number;
-  overspeed: number;
-  no_signal: number;
+  noSignal: number;
   filtered: number;
-  total: number;
 }
 
 // =======================
-// VEHICLE (UNCHANGED – USED EVERYWHERE)
+// VEHICLE (API STRUCTURE)
 // =======================
 
+/**
+ * Vehicle object as returned by the API
+ * All fields are required as per API spec
+ */
 export interface Vehicle {
+  // Vehicle identification
   id: number;
+  unitAlias: string;                // vehicle identifier
+  vehicleNumber: string;            // license plate or vehicle ID
 
-  // normalized fields (used by UI)
-  name?: string;
-  vehicle_Number?: string;
+  // Driver information
+  driverName: string | null;        // null if no driver assigned
+  driverPhone: string;              // phone number or "N/A"
+  driverEmployeeId: string;         // employee ID or empty string
 
-  // API fields
-  unitAlias?: string;
-  vehicleNumber?: string;
+  // Status and location
+  status: VehicleStatus;            // Current status (normalized to enum)
+  lastStatus: VehicleStatus | null; // Previous status
+  statusTime: string;               // ISO8601 timestamp
 
-  status: string;
+  coordinates: [number, number];    // [longitude, latitude]
+  rotation: number;                 // heading in degrees (0-360)
+  location: string;                 // human-readable location string
 
-  driverName?: string;
-  driverPhone?: string;
-  driverEmployeeId?: string;
+  // Vehicle details
+  vehicleType: string;              // "car", "truck", etc
+  signalStrength: string;           // "Strong", "Weak", etc
+  fridgeTemperature: number;        // temperature in degrees (0 if N/A)
 
-  speed?: string;
-  speedLimit?: string;
-  statusTime?: string;
+  // Speed information
+  speed: string;                    // e.g. "45Km/h"
+  speedLimit: string;               // e.g. "60Km/h"
 
-  coordinates: [number, number];
-  rotation?: number;
-  signalStrength?: string;
-  location?: string;
-  vehicleType?: string;
+  // Normalized fields for UI (optional - set by normalizer)
+  name?: string;                    // display name (set from unitAlias or vehicleNumber)
+  vehicle_Number?: string;          // normalized vehicle number
 }
 
-
 // =======================
-// 🔴 OLD API TYPES (KEEP FOR SAFETY)
+// GROUP (ACTUAL API STRUCTURE)
 // =======================
 
+/**
+ * Group object as returned by the API
+ * In the current API, groups are identified by unitAlias (vehicle ID)
+ * One vehicle per group typically
+ */
 export interface Group {
-  name: string;
-  id: string;
-  summary: StatusSummary;
-  vehicles: string[]; // old API vehicle keys
+  id: string;                   // unitAlias
+  name: string;                 // usually same as id
+  summary: StatusSummary;       // status counts for this group
+  vehicles: Vehicle[];          // direct array of vehicles
 }
+
+// =======================
+// AREA (LEGACY - KEPT FOR BACKWARD COMPATIBILITY)
+// =======================
 
 export interface Area {
   name: string;
   id: string;
   summary: StatusSummary;
-  vehicles: string[];
+  vehicles: Vehicle[];
 }
 
 // =======================
-// 🟢 NEW API TYPES (LiveTrack)
+// LIVE TRACK RESPONSE (API RESPONSE STRUCTURE)
 // =======================
 
-export interface LiveTrackApiGroup {
-  id: string;                // ✅ present in API
-  name: string;
-  summary: StatusSummary;    // ✅ present in API
-  vehicles: Vehicle[];       // ✅ present in API
-}
-
-
-// =======================
-// LIVE TRACK RESPONSE (HYBRID SAFE)
-// =======================
-
+/**
+ * Complete LiveTrack API response structure
+ * This matches the actual API response returned by POST /LiveTrack
+ */
 export interface LiveTrackData {
-  // New API
-  groups: LiveTrackApiGroup[];
+  // Main data
+  groups: Group[];
+  summary: StatusSummary;
 
-  // Old API (optional – don’t break screens)
+  // Optional fields from older API versions
   vehicles?: Vehicle[];
   areas?: Area[];
-
-  // Shared
   location_summary?: LocationSummary[];
   vehicle_types?: VehicleTypeSummary[];
-  summary?: StatusSummary;
 }
 
 // =======================
@@ -150,7 +175,7 @@ export interface UIState {
 }
 
 // =======================
-// ✅ PROCESSED GROUP (USED BY UI)
+// PROCESSED GROUP (USED BY UI)
 // =======================
 
 export interface ProcessedGroup {

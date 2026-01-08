@@ -26,14 +26,11 @@ interface AccordionListProps {
  * Safe default totals so UI never crashes on first load
  */
 const EMPTY_TOTALS: StatusSummary = {
-  on: 0,
+  moving: 0,
   idle: 0,
   off: 0,
-  longoff: 0,
-  overspeed: 0,
-  no_signal: 0,
+  noSignal: 0,
   filtered: 0,
-  total: 0,
 };
 
 const AccordionList: React.FC<AccordionListProps> = ({ onFilterPress }) => {
@@ -49,10 +46,9 @@ const AccordionList: React.FC<AccordionListProps> = ({ onFilterPress }) => {
 
   const handleRefresh = async () => {
     try {
-      console.log('🔄 Pull to refresh');
       await refreshLiveTrackData();
     } catch (error) {
-      console.error('❌ Refresh failed:', error);
+      // Silently fail - the context will handle the error state
     }
   };
 

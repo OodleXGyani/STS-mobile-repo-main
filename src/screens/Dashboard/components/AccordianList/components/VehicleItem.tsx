@@ -12,9 +12,10 @@ import {
   SmallRow,
 } from '../accordian-styles';
 import styled from 'styled-components/native';
-import { Vehicle } from '../../../context/types';
+import { Vehicle, VehicleStatus } from '../../../context/types';
 import timeAgo from '../utils';
 import { moderateScale } from 'react-native-size-matters';
+import { getStatusDisplayName, getStatusColor } from '../../../utils/statusNormalizer';
 
 const IconContainer = styled.View`
   position: relative;
@@ -33,7 +34,7 @@ const NoSignalIcon = styled.Image`
 
 interface VehicleItemProps {
   vehicle: Vehicle;
-  carByStatus: Record<string, any>;
+  carByStatus: Record<VehicleStatus, any>;
   starGrey: any;
   starYellow: any;
   clockGrey: any;
@@ -42,8 +43,8 @@ interface VehicleItemProps {
 
 type Nav = NativeStackNavigationProp<{
   DashboardMain: undefined;
-  DetailPage: { 
-    item: Vehicle
+  DetailPage: {
+    item: Vehicle;
   };
 }>;
 
@@ -56,23 +57,33 @@ export const VehicleItem: React.FC<VehicleItemProps> = ({
   noSignalBlue,
 }) => {
   const navigation = useNavigation<Nav>();
-  console.log('vehicle', vehicle)
 
-      const handlePress = () => {
-      navigation.navigate('DetailPage', {
-        item: vehicle,
-      });
-    };
-
-  const getStatusText = (status: string) => {
-    const statusMap: Record<string, string> = {
-      idle: 'Idle',
-      off: 'Off',
-      on: 'On',
-      no_signal: 'No signal',
-    };
-    return statusMap[status] || 'Off';
+  const handlePress = () => {
+    navigation.navigate('DetailPage', {
+      item: vehicle,
+    });
   };
+
+  /**
+   * Get display text for vehicle status
+   * For "Moving" status, show speed; otherwise show status name
+   */
+  const getStatusDisplayText = (status: VehicleStatus, speed: string): string => {
+    return status === VehicleStatus.MOVING ? speed : getStatusDisplayName(status);
+  };
+
+  /**
+   * Parse speed value from speed string (e.g., "45Km/h" -> "45")
+   */
+  const parseSpeed = (speedStr: string): string => {
+    if (!speedStr) return '0';
+    return speedStr.replace(/[^\d]/g, '') || '0';
+  };
+
+  const speed = parseSpeed(vehicle.speed);
+  const driverName = vehicle.driverName && vehicle.driverName !== 'No Driver' ? vehicle.driverName : '—';
+  const location = vehicle.location || '—';
+  const vehicleDisplayName = vehicle.name || vehicle.unitAlias || '—';
 
   return (
     <StyledVehicleItem onPress={handlePress}>
@@ -82,39 +93,39 @@ export const VehicleItem: React.FC<VehicleItemProps> = ({
             source={carByStatus[vehicle.status]}
             style={{ width: 55, height: 20 }}
           />
-          {vehicle.status === 'no_signal' && (
+          {vehicle.status === VehicleStatus.NO_SIGNAL && (
             <NoSignalIcon source={noSignalBlue} />
           )}
         </IconContainer>
-        <StatusText>{vehicle.status === "on" ? `${vehicle.speed}` : getStatusText(vehicle.status)}</StatusText>
+        <StatusText>
+          {getStatusDisplayText(vehicle.status, speed)}
+        </StatusText>
       </ColLeft>
 
       <ColRight>
         <Row>
-                      <VehicleName>{vehicle.driver_name}</VehicleName>
-            <SmallRow>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <SmallIcon
-                  key={i}
-                  source={
-                    i < (vehicle.driver_rating ?? 0) ? starYellow : starGrey
-                  }
-                  style={{
-                    width: 12,
-                    height: 12,
-                    marginLeft: i ? 2 : 0,
-                  }}
-                />
-              ))}
-            </SmallRow>
+          <VehicleName>{driverName}</VehicleName>
+          <SmallRow>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <SmallIcon
+                key={i}
+                source={starYellow}
+                style={{
+                  width: 12,
+                  height: 12,
+                  marginLeft: i ? 2 : 0,
+                }}
+              />
+            ))}
+          </SmallRow>
         </Row>
 
         <Row>
           <VehicleName style={{ fontSize: 14, color: '#9ca3af' }}>
-            {vehicle.name || '—'}
+            {vehicleDisplayName}
           </VehicleName>
           <VehicleName style={{ fontSize: 14, color: '#9ca3af' }}>
-            {vehicle.location || '—'}
+            {location}
           </VehicleName>
           <SmallRow>
             <SmallIcon source={clockGrey} />
@@ -125,7 +136,7 @@ export const VehicleItem: React.FC<VehicleItemProps> = ({
                 marginLeft: 6,
               }}
             >
-              {timeAgo(vehicle.status_time)}
+              {timeAgo(vehicle.statusTime)}
             </VehicleName>
           </SmallRow>
         </Row>

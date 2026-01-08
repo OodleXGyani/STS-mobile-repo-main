@@ -106,15 +106,10 @@ export const FilterProvider: React.FC<FilterProviderProps> = ({ children }) => {
 
   const applyFilters = useCallback(async (): Promise<FilterState> => {
     try {
-      console.log('🚀 Applying filters and fetching LiveTrack data:', filters);
-      
       // Fetch LiveTrack data with current filters
       await fetchLiveTrackData(filters);
-      
-      console.log('✅ Filters applied and LiveTrack data updated successfully');
       return filters;
     } catch (error) {
-      console.error('❌ Error applying filters:', error);
       throw error;
     }
   }, [filters, fetchLiveTrackData]);

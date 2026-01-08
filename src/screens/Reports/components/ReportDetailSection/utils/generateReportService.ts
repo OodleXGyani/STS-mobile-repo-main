@@ -44,7 +44,7 @@ import * as Keychain from 'react-native-keychain';
  * Polling configuration for report job status checks
  */
 const POLLING_CONFIG = {
-  INTERVAL_MS: 2000,        // Poll every 2 seconds
+  INTERVAL_MS: 4000,        // Poll every 4 seconds
   MAX_DURATION_MS: 40000,   // Max 40 seconds total
 };
 
@@ -344,16 +344,20 @@ export function useGenerateReport() {
 
       case REPORT_TYPES.WEEKLY_SUMMARY:
         {
-          console.log('📤 POST /report-requests (weekly summary):', { reportName: 'weekly', payload });
-          const postResponse = await weeklySummary(payload as WeeklySummaryPayload).unwrap();
-          const jobId = postResponse.id;
-          console.log('📥 POST response received:', { jobId, status: postResponse.status });
+          // Use internal retry mechanism for weekly summary due to backend bug
+          const raw = await retryWeeklySummaryWithBackoff(
+            () => weeklySummary(payload as WeeklySummaryPayload).unwrap()
+          );
+          const normalized = normalizeReportResponse(raw);
 
-          // Poll for completion
-          const result = await pollReportCompletion(jobId);
-          console.log('✅ Polling complete, got final result');
+          // Validate weekly summary has expected data before returning
+          if (!normalized || !normalized.WeeklySummaryModelList) {
+            throw new Error(
+              'Weekly summary report returned empty or invalid data. Please try again.'
+            );
+          }
 
-          return normalizeReportResponse(result);
+          return normalized;
         }
 
       case REPORT_TYPES.MONTHLY_SUMMARY:

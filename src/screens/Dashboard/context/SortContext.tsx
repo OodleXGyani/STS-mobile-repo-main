@@ -50,19 +50,9 @@ export const SortProvider: React.FC<SortProviderProps> = ({ children }) => {
   // ===== ACTIONS =====
   
   const updateSort = useCallback(async (sortUpdate: Partial<SortState>) => {
-    try {
-      // Update sort state in FilterStateContext
-      updateSortState(sortUpdate);
-      
-      console.log('🚀 Sort updated in FilterStateContext:', sortUpdate);
-      console.log('📊 LiveTrackContext will automatically detect the change and fetch new data');
-      
-      // Don't call fetchLiveTrackData here - let LiveTrackContext handle it automatically
-      // when it detects the state change via useFilterState()
-      
-    } catch (error) {
-      console.error('❌ Error updating sort state:', error);
-    }
+    // Update sort state in FilterStateContext
+    // LiveTrackContext will automatically detect the change and fetch new data
+    updateSortState(sortUpdate);
   }, [updateSortState]);
 
   const resetSort = () => {

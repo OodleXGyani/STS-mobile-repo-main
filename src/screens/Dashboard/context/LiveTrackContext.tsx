@@ -7,16 +7,15 @@ import React, {
   useEffect,
 } from 'react';
 
-import { Vehicle } from '../components/VehicleSelectFilter/types';
-
-
 import {
   LiveTrackData,
   ProcessedGroup,
+  Vehicle,
 } from './types';
 
 import { useGetLiveTrackDataMutation } from '../../../services/liveTrack';
 import { useFilterState } from './FilterStateContext';
+import { normalizeApiResponse } from '../utils/vehicleNormalizer';
 
 // =======================
 // CONTEXT STATE
@@ -126,52 +125,32 @@ export const LiveTrackProvider: React.FC<LiveTrackProviderProps> = ({
           filters?.search_text ?? state.searchQuery ?? null,
       };
 
-      const response = await getLiveTrackData(payload).unwrap();
+      const rawResponse = await getLiveTrackData(payload).unwrap();
 
-      // 🔥 FULL RAW API RESPONSE (DEBUG)
-      // console.log(
-      //   '🔥 LiveTrack FULL RESPONSE:',
-      //   JSON.stringify(response, null, 2)
-      // );
+      // Normalize the API response to our canonical structure
+      const normalizedData = normalizeApiResponse(rawResponse);
 
-      // ✅ New API: vehicles already included in groups
-      const processedGroups: ProcessedGroup[] =
-        Array.isArray(response?.groups)
-          ? response.groups.map(group => ({
-              key: group.id,                 // ✅ use id
-              name: group.name,
-              count: group.vehicles?.length ?? 0,
-              vehicles: (group.vehicles ?? []).map((v: Vehicle) => ({
-                ...v,
-                            
-                // ✅ normalize fields for UI
-                name: v.unitAlias ?? v.vehicleNumber ?? `Vehicle-${v.id}`,
-                vehicle_Number: v.vehicleNumber ?? 'N/A',
-                            
-                // normalize status casing
-                status: typeof v.status === 'string'
-                  ? v.status.toLowerCase()
-                  : 'off',
-              })),
-               // ✅ vehicles NOT items
-                          }))
-          : [];
-          
+      // Create processed groups for UI consumption
+      const processedGroups: ProcessedGroup[] = (normalizedData.groups ?? [])
+        .map(group => ({
+          key: group.id,
+          name: group.name,
+          count: group.vehicles?.length ?? 0,
+          vehicles: group.vehicles ?? [],
+        }));
 
       setState(prev => ({
         ...prev,
-        liveTrackData: response,
+        liveTrackData: normalizedData,
         processedGroups,
       }));
     } catch (error) {
-      console.error('❌ LiveTrack fetch failed:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'LiveTrack fetch failed';
 
       setState(prev => ({
         ...prev,
-        liveTrackError:
-          error instanceof Error
-            ? error.message
-            : 'LiveTrack fetch failed',
+        liveTrackError: errorMessage,
         processedGroups: [],
       }));
     } finally {

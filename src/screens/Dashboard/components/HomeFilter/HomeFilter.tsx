@@ -79,7 +79,7 @@ const HomeFilter: React.FC<FilterActionsType> = ({
       const appliedFilters = await contextApplyFilters();
       onApply(appliedFilters);
     } catch (error) {
-      console.error('Failed to apply filters:', error);
+      // Silently fail - the filter context will handle the error
     }
   }, [contextApplyFilters, onApply]);
 

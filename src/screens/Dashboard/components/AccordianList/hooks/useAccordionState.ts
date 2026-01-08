@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useDashboardLiveTrack, useDashboardSort } from '../../../context';
-import { ProcessedGroup, LiveTrackApiGroup } from '../../../context/types';
+import { ProcessedGroup, Group } from '../../../context/types';
 
 export const useAccordionState = () => {
   const { liveTrackData, refreshLiveTrackData, liveTrackLoading } =
@@ -11,15 +11,18 @@ export const useAccordionState = () => {
 
   const currentGroupBy = sort?.groupBy ?? 'status';
 
-  // ✅ CORRECT mapping based on REAL API
+  /**
+   * Transform groups from API to ProcessedGroup format
+   * Groups already contain normalized vehicles from the normalizer
+   */
   const groups: ProcessedGroup[] = useMemo(() => {
     if (!liveTrackData?.groups) return [];
 
-    return (liveTrackData.groups as LiveTrackApiGroup[]).map(group => ({
-      key: group.id,                         // ✅ id exists
+    return liveTrackData.groups.map(group => ({
+      key: group.id,                         // Vehicle ID (unitAlias)
       name: group.name,
-      count: group.vehicles?.length ?? 0,    // ✅ derive count
-      vehicles: group.vehicles ?? [],        // ✅ vehicles exists
+      count: group.vehicles?.length ?? 0,    // Count of vehicles in group
+      vehicles: group.vehicles ?? [],        // Already normalized vehicles
     }));
   }, [liveTrackData]);
 

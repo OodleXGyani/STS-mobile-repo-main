@@ -16,7 +16,7 @@ import { useMapState } from './hooks/useMapState';
 import { useMapSearch } from './hooks/useMapSearch';
 import { useDashboardLiveTrack } from '../../context';
 import { useFilterState } from '../../context/FilterStateContext';
-import { Vehicle } from '../VehicleSelectFilter/types';
+import { Vehicle } from '../../context/types';
 import { MapLayerMenuState } from './components/MapSortMenue/MapLayerMenueTypes';
 import { BAHRAIN_REGION, CLUSTERING_CONFIG } from './constants';
 import { DISPLAYED_STATUSES, STATUS_COLORS } from '../AccordianList/constants';
