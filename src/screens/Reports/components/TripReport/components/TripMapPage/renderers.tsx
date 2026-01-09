@@ -19,10 +19,17 @@ import { MapLayerMenuState } from '../../../../../Dashboard/components/Maps/comp
 export const renderMapLayers = (menuState: MapLayerMenuState) => {
   return (
     <>
-      {/* Google Maps Layer */}
+      {/* Google Maps Layer - renders Google satellite tiles */}
       {menuState.mapLayer === 'google' && (
         <>
-          {/* Standard Google Maps - no additional tiles needed */}
+          <UrlTile
+            urlTemplate="http://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+            maximumZ={19}
+            minimumZ={0}
+            zIndex={0}
+            tileSize={256}
+            flipY={false}
+          />
         </>
       )}
 

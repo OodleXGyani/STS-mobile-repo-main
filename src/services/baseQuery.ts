@@ -91,7 +91,7 @@ export const baseQueryWithAuth: BaseQueryFn<
   console.log('📥 [baseQuery] API Response URL:', result.meta?.response?.url);
   console.log('📥 [baseQuery] Response Data:', result.data ? 'Present' : 'Null/Empty');
   if (result.data) {
-    console.log('📥 [baseQuery] Response Data (first 500 chars):', JSON.stringify(result.data, null, 2).substring(0, 500));
+    // console.log('📥 [baseQuery] Response Data (first 500 chars):', JSON.stringify(result.data, null, 2).substring(0, 500));
   }
 
   // =======================

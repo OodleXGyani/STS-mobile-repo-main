@@ -249,6 +249,91 @@ export function useGenerateReport() {
   const [vehiclePath, vehiclePathState] = useGetVehiclePathReportMutation();
 
   /**
+   * Transforms weekly report response to expected component format
+   *
+   * The API returns:
+   * {
+   *   id: number,
+   *   status: string,
+   *   reportName: string,
+   *   result: [{
+   *     VehicleName: string,
+   *     TotalDistance: number,
+   *     AverageIdleTime: number,
+   *     AverageOperationTime: number,
+   *     ...other fields...
+   *   }],
+   *   ...
+   * }
+   *
+   * But the component expects:
+   * {
+   *   WeeklySummaryModelList: [{
+   *     VehicleName: string,
+   *     SummaryTotalDistance: number,
+   *     SummaryIdleTime: number,
+   *     SummaryOperationTime: number,
+   *     ...
+   *   }]
+   * }
+   *
+   * This function maps the API field names to component expected field names.
+   *
+   * @param apiResponse - The full API response object or result array
+   * @returns Transformed response with WeeklySummaryModelList property and normalized field names
+   */
+  function transformWeeklySummaryReportResponse(apiResponse: any): any {
+    console.log('🔄 [transformWeeklySummaryReportResponse] Starting transformation...');
+    console.log('🔄 [transformWeeklySummaryReportResponse] Input type:', typeof apiResponse);
+    console.log('🔄 [transformWeeklySummaryReportResponse] Is array?', Array.isArray(apiResponse));
+
+    if (!apiResponse) {
+      console.warn('⚠️ [transformWeeklySummaryReportResponse] Response is null/undefined');
+      return { WeeklySummaryModelList: [] };
+    }
+
+    let vehicleDataArray: any[] = [];
+
+    // Extract vehicle data array based on response format
+    if (Array.isArray(apiResponse)) {
+      console.log(`✅ [transformWeeklySummaryReportResponse] Response is already an array with ${apiResponse.length} records`);
+      vehicleDataArray = apiResponse;
+    } else if (apiResponse.result && Array.isArray(apiResponse.result)) {
+      console.log(`✅ [transformWeeklySummaryReportResponse] Found 'result' property with ${apiResponse.result.length} records`);
+      console.log('📦 [transformWeeklySummaryReportResponse] First record sample:', JSON.stringify(apiResponse.result[0], null, 2).substring(0, 300));
+      vehicleDataArray = apiResponse.result;
+    } else if (apiResponse.WeeklySummaryModelList && Array.isArray(apiResponse.WeeklySummaryModelList)) {
+      console.log(`✅ [transformWeeklySummaryReportResponse] Already has correct format with ${apiResponse.WeeklySummaryModelList.length} records`);
+      return apiResponse;
+    } else {
+      console.warn('⚠️ [transformWeeklySummaryReportResponse] Unexpected response structure');
+      console.warn('Response keys:', Object.keys(apiResponse || {}));
+      return { WeeklySummaryModelList: [] };
+    }
+
+    // Normalize field names to match component expectations
+    // Map API field names to component expected field names
+    const normalizedData = vehicleDataArray.map((vehicle: any) => ({
+      ...vehicle,
+      // Normalize distance field
+      SummaryTotalDistance: vehicle.SummaryTotalDistance ?? vehicle.TotalDistance ?? 0,
+      // Normalize idle time field - API sends AverageIdleTime, component expects SummaryIdleTime
+      SummaryIdleTime: vehicle.SummaryIdleTime ?? vehicle.AverageIdleTime ?? 0,
+      // Normalize stop time field - API sends AverageStopTime, component expects SummaryStopTime
+      SummaryStopTime: vehicle.SummaryStopTime ?? vehicle.AverageStopTime ?? 0,
+      // Normalize operation time field - API sends AverageOperationTime, component expects SummaryOperationTime
+      SummaryOperationTime: vehicle.SummaryOperationTime ?? vehicle.AverageOperationTime ?? 0,
+      // Keep all other fields as-is for display
+    }));
+
+    console.log('🔄 [transformWeeklySummaryReportResponse] Normalized first record:',
+      JSON.stringify(normalizedData[0], null, 2).substring(0, 300));
+    console.log(`✅ [transformWeeklySummaryReportResponse] Transformation complete - ${normalizedData.length} records`);
+
+    return { WeeklySummaryModelList: normalizedData };
+  }
+
+  /**
    * Transforms monthly report response array to expected component format
    *
    * The API returns an array of vehicle summaries, but the component expects:
@@ -489,7 +574,19 @@ export function useGenerateReport() {
           const result = await pollReportCompletion(jobId);
           console.log('✅ Polling complete, got final result');
 
-          return normalizeReportResponse(result);
+          // Transform the weekly report response: API returns { result: [...] },
+          // but component expects { WeeklySummaryModelList: [...] }
+          const normalizedResult = normalizeReportResponse(result);
+          console.log('🔍 [WEEKLY_SUMMARY] Normalized result type:', typeof normalizedResult);
+          console.log('🔍 [WEEKLY_SUMMARY] Is array?', Array.isArray(normalizedResult));
+          console.log('🔍 [WEEKLY_SUMMARY] Has result property?', normalizedResult && 'result' in normalizedResult);
+
+          const transformedResult = transformWeeklySummaryReportResponse(normalizedResult);
+          console.log('✅ [WEEKLY_SUMMARY] Transformation complete');
+          console.log('✅ [WEEKLY_SUMMARY] Has WeeklySummaryModelList?', !!transformedResult.WeeklySummaryModelList);
+          console.log('✅ [WEEKLY_SUMMARY] Record count:', transformedResult.WeeklySummaryModelList ? transformedResult.WeeklySummaryModelList.length : 0);
+
+          return transformedResult;
         }
 
       case REPORT_TYPES.MONTHLY_SUMMARY:

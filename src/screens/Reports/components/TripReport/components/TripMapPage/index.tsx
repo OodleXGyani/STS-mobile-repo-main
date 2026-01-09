@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useRoute } from '@react-navigation/native';
 import { View, Text } from 'react-native';
 // Type imports
@@ -69,6 +69,15 @@ const TripMapPage: React.FC = () => {
   console.log('🗺️ [TripMapPage] Map region:', mapRegion);
   const { handleBackPress } = useNavigationHandlers();
   const { handlePathPress } = usePathHandlers(transformedTripData);
+
+  // Calculate mapType dynamically based on selected layer
+  // Reference: src/screens/Dashboard/components/Maps/Map.tsx
+  const mapType = useMemo(() => {
+    if (menuState.mapLayer === 'satellite' || menuState.mapLayer === 'stsHybrid') {
+      return 'satellite';
+    }
+    return 'standard';
+  }, [menuState.mapLayer]);
 
   // Show error state if no coordinates available
   const hasCoordinates = transformedTripData?.path?.coordinates?.length > 0;
@@ -165,7 +174,7 @@ const TripMapPage: React.FC = () => {
             provider={PROVIDER_GOOGLE}
             style={MAP_VIEW_STYLE}
             initialRegion={mapRegion}
-            mapType="standard"
+            mapType={mapType}
             toolbarEnabled={false}
             rotateEnabled={true}
             moveOnMarkerPress={false}
